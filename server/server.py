@@ -3,8 +3,8 @@
 # TDA596 Labs - Server Skeleton
 # server/server.py
 # Input: Node_ID total_number_of_ID
-# Student Group:
-# Student names: John Doe & John Doe
+# Student Group: 23
+# Student names: Henrick Nume & Peter Pickerill
 #------------------------------------------------------------------------------------------------------
 # We import various libraries
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler # Socket specifically designed to handle HTTP requests
