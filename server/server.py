@@ -24,7 +24,7 @@ entry_template = ""
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
-PORT_NUMBER = 80
+PORT_NUMBER = 61001
 #------------------------------------------------------------------------------------------------------
 
 
@@ -102,7 +102,7 @@ class BlackboardServer(HTTPServer):
 			if vessel != ("10.1.0.%s" % self.vessel_id):
 				# A good practice would be to try again if the request failed
 				# Here, we do it only once
-				self.contact_vessel(vessel, path, action, key, value)		
+				self.contact_vessel(vessel, path, action, key, value)
 #------------------------------------------------------------------------------------------------------
 
 
@@ -137,7 +137,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		post_data = parse_qs(self.rfile.read(length), keep_blank_values=1)
 		# we return the data
 		return post_data
-#------------------------------------------------------------------------------------------------------	
+#------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
 # Request handling - GET
 #------------------------------------------------------------------------------------------------------
@@ -155,10 +155,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		self.set_HTTP_headers(200)
 		# We should do some real HTML here
 		html_reponse = "<html><head><title>Basic Skeleton</title></head><body>This is the basic HTML content when receiving a GET</body></html>"
-		#In practice, go over the entries list, 
-		#produce the boardcontents part, 
+		#In practice, go over the entries list,
+		#produce the boardcontents part,
 		#then construct the full page by combining all the parts ...
-		
+
 		self.wfile.write(html_reponse)
 #------------------------------------------------------------------------------------------------------
 	# we might want some other functions
@@ -177,7 +177,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		if retransmit:
 			# do_POST send the message only when the function finishes
 			# We must then create threads if we want to do some heavy computation
-			# 
+			#
 			# Random content
 			thread = Thread(target=self.server.propagate_value_to_vessels,args=("action", "key", "value") )
 			# We kill the process if we kill the server
@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
 	# We launch a server
 	server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
-	print("Starting the server on port %d" % PORT_NUMBER)
+	print("Starting the server on :  %s : %d" % server_adress, PORT_NUMBER)
 
 	try:
 		server.serve_forever()
