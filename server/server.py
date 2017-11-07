@@ -17,10 +17,10 @@ from threading import  Thread # Thread Management
 #------------------------------------------------------------------------------------------------------
 
 # Global variables for HTML templates
-board_frontpage_footer_template = ""
-board_frontpage_header_template = ""
-boardcontents_template = ""
-entry_template = ""
+board_frontpage_footer_template = "board_frontpage_footer_template.html"
+board_frontpage_header_template = "board_frontpage_header_template.html"
+boardcontents_template = "boardcontents_template.html"
+entry_template = "entry_template.html"
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
@@ -155,12 +155,16 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		# We set the response status code to 200 (OK)
 		self.set_HTTP_headers(200)
 		# We should do some real HTML here
-		html_reponse = "<html><head><title>Basic Skeleton</title></head><body>This is the basic HTML content when receiving a GET</body></html>"
+		files = [board_frontpage_header_template, boardcontents_template, board_frontpage_footer_template]
+		for filename in files:
+			with open(filename, "r") as file:
+				for line in file:
+					self.wfile.write(line)
 		#In practice, go over the entries list,
 		#produce the boardcontents part,
 		#then construct the full page by combining all the parts ...
 
-		self.wfile.write(html_reponse)
+		#self.wfile.write(html_reponse)
 #------------------------------------------------------------------------------------------------------
 	# we might want some other functions
 #------------------------------------------------------------------------------------------------------
