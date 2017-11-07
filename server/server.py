@@ -36,6 +36,7 @@ class BlackboardServer(HTTPServer):
 #------------------------------------------------------------------------------------------------------
 	def __init__(self, server_address, handler, node_id, vessel_list):
 	# We call the super init
+		print "Server address: %s" % (server_address,)
 		HTTPServer.__init__(self,server_address, handler)
 		# we create the dictionary of values
 		self.store = {}
@@ -216,7 +217,7 @@ if __name__ == '__main__':
 
 	# We launch a server
 	server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
-	print("Starting the server on :  %s : %d" % server_adress, PORT_NUMBER)
+	print("Starting the server on port: %d" % PORT_NUMBER)
 
 	try:
 		server.serve_forever()
