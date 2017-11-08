@@ -17,10 +17,10 @@ from threading import  Thread # Thread Management
 #------------------------------------------------------------------------------------------------------
 
 # Global variables for HTML templates
-board_frontpage_footer_template = "board_frontpage_footer_template.html"
-board_frontpage_header_template = "board_frontpage_header_template.html"
-boardcontents_template = "boardcontents_template.html"
-entry_template = "entry_template.html"
+board_frontpage_footer_template = ""
+board_frontpage_header_template = ""
+boardcontents_template = ""
+entry_template = ""
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
@@ -36,7 +36,6 @@ class BlackboardServer(HTTPServer):
 #------------------------------------------------------------------------------------------------------
 	def __init__(self, server_address, handler, node_id, vessel_list):
 	# We call the super init
-		print "Server address: %s" % (server_address,)
 		HTTPServer.__init__(self,server_address, handler)
 		# we create the dictionary of values
 		self.store = {}
@@ -146,25 +145,52 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 	# This function is called AUTOMATICALLY upon reception and is executed as a thread!
 	def do_GET(self):
 		print("Receiving a GET on path %s" % self.path)
+
 		# Here, we should check which path was requested and call the right logic based on it
-		self.do_GET_Index()
+		if self.path == "/board":
+			self.do_GET_Board()
+
+		elif self.path == "/entries":
+			self.do_GET_Entries()
+
+		# Default?
+		else:
+			self.do_GET_Index()
+
 #------------------------------------------------------------------------------------------------------
 # GET logic - specific path
 #------------------------------------------------------------------------------------------------------
+	def do_GET_Entries(self):
+		self.set_HTTP_headers(200)
+		#starting with static data.
+		entry1 = entry_template % ("entries/1", 1, "First message" )  # (action, id ,entry)
+		entry2 = entry_template % ("entries/2", 2, "Second message" )
+		html_response = entry1 + entry2
+		self.wfile.write(html_response)
+
+
+	def do_GET_Board(self):
+		self.set_HTTP_headers(200)
+
+		entries = self.do_GET_Entries()
+		board = boardcontents_template % ("My Board", entries) # (boardtitle, entries)
+		self.wfile.write(board)
+
+
 	def do_GET_Index(self):
 		# We set the response status code to 200 (OK)
 		self.set_HTTP_headers(200)
 		# We should do some real HTML here
-		files = [board_frontpage_header_template, boardcontents_template, board_frontpage_footer_template]
-		for filename in files:
-			with open(filename, "r") as file:
-				for line in file:
-					self.wfile.write(line)
 		#In practice, go over the entries list,
 		#produce the boardcontents part,
 		#then construct the full page by combining all the parts ...
 
-		#self.wfile.write(html_reponse)
+		header = board_frontpage_header_template
+		body = boardcontents_template % ("My Board", self.do_GET_Entries())
+		footer = board_frontpage_footer_template % ("The dude and the other dude") 	#(groupMembers)
+		self.wfile.write(header + body + footer)
+
+
 #------------------------------------------------------------------------------------------------------
 	# we might want some other functions
 #------------------------------------------------------------------------------------------------------
@@ -200,12 +226,25 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
 
 #------------------------------------------------------------------------------------------------------
+# file i/o
+def read_file(filename):
+    opened_file = open(filename, 'r')
+    all_content = ''
+    for line in opened_file:
+        all_content += line
+    opened_file.close()
+    return all_content
 #------------------------------------------------------------------------------------------------------
+
 # Execute the code
 if __name__ == '__main__':
 
 	## read the templates from the corresponding html files
-	# .....
+
+	board_frontpage_header_template = read_file('board_frontpage_header_template.html')
+	board_frontpage_footer_template = read_file('board_frontpage_footer_template.html')
+	boardcontents_template = read_file('boardcontents_template.html')
+	entry_template = read_file('entry_template.html')
 
 	vessel_list = []
 	vessel_id = 0
@@ -222,6 +261,14 @@ if __name__ == '__main__':
 	# We launch a server
 	server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
 	print("Starting the server on port: %d" % PORT_NUMBER)
+
+	# Printing all vessels
+	print "All vessels:"
+	for vessel in vessel_list:
+		if vessel.endswith(str(vessel_id)):
+			print "%s:%s <-- this server" % (vessel, PORT_NUMBER)
+		else:
+			print "%s:%s" % (vessel, PORT_NUMBER)
 
 	try:
 		server.serve_forever()
