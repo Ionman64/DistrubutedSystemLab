@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!-- Meta data for search engines ... Not important. -->
+<meta name="description" content="Blackboard for distributed systems course"/>
+<meta name="keywords" content="Lab"/>
+<meta name="author" content="Beshr Al Nahas"/>
+<!-- Important for the browser to show the page in the correct encoding -->
+<meta charset="UTF-8"/>
+<!-- Important for the browser to include the jQuery library. It is used to update the page contents automatically. -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<!-- Inlined javascript code. This could be optionally hosted in another file on the server and included using 'src' attribute as above -->
+<script>
+	var page_reload_timeout = 2; //in seconds
+var page_reload_count = 0;
+
+function update_contents(){
+    page_reload_count += 1;
+    $("#boardcontents_placeholder").load("/board #boardcontents_placeholder", function (data, status) {
+        //alert("Data: " + data + "\nStatus: " + status);
+        $("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
+    });
+}
+function el(m) {
+	return document.createElement(m);
+}
+function load_board_ajax() {
+	$.ajax({
+		url:"/board",
+		method:"GET",
+		dataType:"JSON",
+		crossOrigin:true,
+		success:function(data, status) {
+			/*<div id="boardcontents_placeholder">
+				<!-- The title comes here -->
+				<div id="boardtitle_placeholder" class="boardtitle">%s</div>
+				<input type="text" name="id" value="ID" readonly>
+				<input type="text" name="entry" value="Entry" size="70%%" readonly>
+				<!-- The entries come here -->
+				%s
+			</div>*/
+			$("#board-contents").empty();
+			$.each(data, function(key, value) {
+				var board_entry = el("section");
+				board_entry.id = "boardcontents_placeholder"; 
+				var boardtitle = el("section");
+				boardtitle.id = "boardtitle_placeholder";
+				boardtitle.className = "boardtitle";
+				board_entry.appendChild(boardtitle);
+				var input = el("input");
+				input.type = "text";
+				input.name = "id";
+				input.value = key;
+				input.readonly = true;
+				board_entry.appendChild(input);
+				var input = el("input");
+				input.type = "text";
+				input.name = "entry";
+				input.value = value;
+				input.style.size = "70%";
+				board_entry.appendChild(input);
+				var button = el("button");
+				button.innerHTML = "modify";
+				button.className = "modify";
+				button.setAttribute("data-id", key);
+				board_entry.appendChild(button);
+				var button = el("button");
+				button.innerHTML = "delete";
+				button.className = "delete";
+				button.setAttribute("data-id", key);
+				board_entry.appendChild(button);
+				$("#board-contents").append(board_entry);
+			});
+		},
+		complete:function() {
+			console.log("updated board");
+		}
+	});
+}
+function add_entry_ajax() {
+	$.ajax({
+		url:"/board",
+		method:"POST",
+		dataType:"JSON",
+		crossOrigin:true,
+		data: {"entry":$("#entry").val()},
+		sucess:function(data, status) {
+			page_reload_count++;
+			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
+		},
+		complete: function() {
+			console.log("added new entry to contents");
+		}
+	});
+	return false;
+}
+function modify_ajax(id) {
+	$.ajax({
+		url:"/entries/" + id,
+		method:"POST",
+		dataType:"JSON",
+		crossOrigin:true,
+		data: {"entry":$("#entry").val()},
+		sucess:function(data, status) {
+			page_reload_count++;
+			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
+		},
+		complete: function() {
+			console.log("added new entry to contents");
+		}
+	});
+}
+function delete_ajax(id) {
+	$.ajax({
+		url:"/entries/" + id,
+		method:"DELETE",
+		dataType:"JSON",
+		crossOrigin:true,
+		sucess:function(data, status) {
+			page_reload_count++;
+			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
+		},
+		complete: function() {
+			console.log("added new entry to contents");
+		}
+	});
+}
+function reload_countdown(remaining) {
+    $("#countdown_placeholder").text("reloading page in: " + remaining + " seconds.");
+    if (remaining <= 0) {
+        remaining = page_reload_timeout;
+        load_board_ajax();
+    }
+    setTimeout(function() {
+        reload_countdown(remaining - 1);
+    }, 1000);
+}
+
+$(document).ready(function() {
+    reload_countdown(page_reload_timeout);
+    $("#board-contents").on("click", ".modify", function() {
+    	modify_ajax($(this).attr("data-id"));
+    });
+    $("#board-contents").on("click", ".delete", function() {
+    	delete_ajax($(this).attr("data-id"));
+    });
+});
+</script>
+<!-- this place defines the style (format) for different elements of the page -->
+<style>
+	.status {
+    color: red;
+    font-size: 75%;
+}
+
+.entry_title {
+    margin: 2px 0px 0px 0px;
+    color: blue;
+    font-size: 110%;
+    font-weight: bold;
+}
+
+.entryform {
+    margin: 2px 0px 0px 0px;
+    color: blue;
+}
+
+#clock_placeholder {
+    font-size: 75%;
+}
+
+#countdown_placeholder {
+    font-size: 75%;
+}
+
+#boardcontents_status_placeholder {
+    font-size: 75%; color: gray;
+}
+
+footer {
+    margin: 10px 0px 0px 0px;
+    font-size: 75%;
+    color: gray;
+}
+
+#boardcontents_placeholder {
+    margin: 10px 0px 0px 0px;
+    border: 1px dotted green;
+}
+
+#boardtitle_placeholder {
+    font-size: 125%;
+    font-weight: bold;
+}
+</style>
+    <title>Distributed board - TDA596 (Chalmers)</title>
+</head>
+	<body>
+		<!-- this place will show a count down for the automatic reload of the board contents, downloaded periodically from the server using the javascript function reload_countdown. -->
+		<section id="countdown_placeholder"></section>
+		<!-- this place will show the actual contents of the blackboard.
+		It will be reloaded automatically from the server -->
+		<!-- This place shows the status of the auto-reload.
+		An error shown here means the server is not responding -->
+		<section id="boardcontents_status_placeholder">0: success</section>
+
+		<!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->
+		<section id="board_form_placeholder">
+		    <h3>Submit to board</h3>
+		    <form onsubmit="add_entry_ajax();return false;" method="post" id="usrform" target="noreload-form-target">
+		        <input type="text" id="entry" name="entry" style="width:70%"/>
+		        <input type="submit" value="Submit to board2"/>
+		    </form>
+		</section>
+    	<!-- The board contents come here -->	
+		<section id="board-contents">
+			
+		</section>
+	</body>
+</html>
+

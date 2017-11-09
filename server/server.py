@@ -15,7 +15,6 @@ from urllib import urlencode # Encode POST content into the HTTP header
 from codecs import open # Open a file
 from threading import  Thread # Thread Management
 import uuid
-import web
 import json
 #------------------------------------------------------------------------------------------------------
 
@@ -128,7 +127,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		 # We set the response status code (200 if OK, something else otherwise)
 		self.send_response(status_code)
 		# We set the content type to HTML
-		self.send_header("Content-type","text/html")
+		#self.send_header("Content-type","text/html")
 		# No more important headers, we can close them
 		self.end_headers()
 #------------------------------------------------------------------------------------------------------
@@ -182,7 +181,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		entries = "%s%s" % (entry1, entry2)
 		#print entries
 		board = boardcontents_template % ("Banana Board", self.gen_entries_html()) # (boardtitle, entries)
-		self.wfile.write(board)
+		#self.wfile.write(board)
+		Entries["he"] = "hello"
+		print(json.dumps(Entries))
+		self.wfile.write(json.dumps(Entries))
 
 
 	def do_GET_Index(self):
@@ -269,8 +271,8 @@ def read_file(filename):
 if __name__ == '__main__':
 
 	## read the templates from the corresponding html files
-
-	board_frontpage_header_template = read_file('board_frontpage_header_template.html')
+	board_frontpage_header_template = index = read_file("index.html");
+	#board_frontpage_header_template = read_file('board_frontpage_header_template.html')
 	board_frontpage_footer_template = read_file('board_frontpage_footer_template.html')
 	boardcontents_template = read_file('boardcontents_template.html')
 	entry_template = read_file('entry_template.html')

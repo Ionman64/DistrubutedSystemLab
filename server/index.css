@@ -1,0 +1,44 @@
+.status {
+    color: red;
+    font-size: 75%;
+}
+
+.entry_title {
+    margin: 2px 0px 0px 0px;
+    color: blue;
+    font-size: 110%;
+    font-weight: bold;
+}
+
+.entryform {
+    margin: 2px 0px 0px 0px;
+    color: blue;
+}
+
+#clock_placeholder {
+    font-size: 75%;
+}
+
+#countdown_placeholder {
+    font-size: 75%;
+}
+
+#boardcontents_status_placeholder {
+    font-size: 75%; color: gray;
+}
+
+footer {
+    margin: 10px 0px 0px 0px;
+    font-size: 75%;
+    color: gray;
+}
+
+#boardcontents_placeholder {
+    margin: 10px 0px 0px 0px;
+    border: 1px dotted green;
+}
+
+#boardtitle_placeholder {
+    font-size: 125%;
+    font-weight: bold;
+}
