@@ -14,6 +14,9 @@ from httplib import HTTPConnection # Create a HTTP connection, as a client (for 
 from urllib import urlencode # Encode POST content into the HTTP header
 from codecs import open # Open a file
 from threading import  Thread # Thread Management
+import uuid
+import web
+import json
 #------------------------------------------------------------------------------------------------------
 
 # Global variables for HTML templates
@@ -27,8 +30,7 @@ entry_template = ""
 PORT_NUMBER = 61001
 #------------------------------------------------------------------------------------------------------
 
-
-
+Entries = {}
 
 #------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
@@ -49,17 +51,19 @@ class BlackboardServer(HTTPServer):
 	# We add a value received to the store
 	def add_value_to_store(self, value):
 		# We add the value to the store
-		pass
+		id =str(uuid.uuid4())
+		Entries[id] = value
+		return id
 #------------------------------------------------------------------------------------------------------
 	# We modify a value received in the store
 	def modify_value_in_store(self,key,value):
 		# we modify a value in the store if it exists
-		pass
+		Entries[key] = value
 #------------------------------------------------------------------------------------------------------
 	# We delete a value received from the store
 	def delete_value_in_store(self,key):
 		# we delete a value in the store if it exists
-		pass
+		del Entries[key]
 #------------------------------------------------------------------------------------------------------
 # Contact a specific vessel with a set of variables to transmit to it
 	def contact_vessel(self, vessel_ip, path, action, key, value):
@@ -163,7 +167,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 	def do_GET_Entries(self):
 		self.set_HTTP_headers(200)
 		#starting with static data.
-		entry1 = entry_template % ("entries/1", 1, "First message" )  # (action, id ,entry)
+		entry1 = entry_template % ("entries/", 1, "First message" )  # (action, id ,entry)
 		entry2 = entry_template % ("entries/2", 2, "Second message" )
 		html_response = "%s%s" % (entry1, entry2)
 		self.wfile.write(html_response)
@@ -189,7 +193,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		#then construct the full page by combining all the parts ...
 
 		header = board_frontpage_header_template
-		body = boardcontents_template % ("My Board", self.do_GET_Entries())
+		body = boardcontents_template % ("My Board", "good day")
 		footer = board_frontpage_footer_template % ("The dude and the other dude") 	#(groupMembers)
 		self.wfile.write(header + body + footer)
 
@@ -206,7 +210,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		# We should also parse the data received
 		# and set the headers for the client
 
+
+		if self.path == "/board":
+			self.do_POST_Board()
+
 		# If we want to retransmit what we received to the other vessels
+		pass
 		retransmit = False # Like this, we will just create infinite loops!
 		if retransmit:
 			# do_POST send the message only when the function finishes
@@ -223,10 +232,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 #------------------------------------------------------------------------------------------------------
 	# We might want some functions here as well
 #------------------------------------------------------------------------------------------------------
-
-
-
-
+	def do_POST_Board(self):
+		self.set_HTTP_headers(200)
+		res = self.parse_POST_request()
+		server.add_value_to_store(res['entry'][0])
+		self.wfile.write(json.dumps({"status": "OK"}))
 
 #------------------------------------------------------------------------------------------------------
 # file i/o
