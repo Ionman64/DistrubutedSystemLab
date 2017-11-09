@@ -166,12 +166,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 #------------------------------------------------------------------------------------------------------
 	def do_GET_Entries(self):
 		self.set_HTTP_headers(200)
-		#starting with static data.
-		entry1 = entry_template % ("entries/", 1, "First message" )  # (action, id ,entry)
-		entry2 = entry_template % ("entries/2", 2, "Second message" )
-		html_response = "%s%s" % (entry1, entry2)
-		self.wfile.write(html_response)
+		self.wfile.write(self.gen_entries_html)
 
+	def gen_entries_html(self):
+		html_response = ""
+		for key, value in Entries.iteritems():
+			html_response += entry_template % ("entries/", key, value )
+		return html_response
 
 	def do_GET_Board(self):
 		self.set_HTTP_headers(200)
@@ -180,7 +181,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		entry2 = entry_template % ("entries/2", 2, "Second message" )
 		entries = "%s%s" % (entry1, entry2)
 		#print entries
-		board = boardcontents_template % ("My Board", entries) # (boardtitle, entries)
+		board = boardcontents_template % ("Banana Board", self.gen_entries_html()) # (boardtitle, entries)
 		self.wfile.write(board)
 
 
@@ -214,6 +215,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		if self.path == "/board":
 			self.do_POST_Board()
 
+		elif self.path.startswith("/entries/"):
+			# {'entry': ['asdfasdf'], 'delete': ['1']}
+			print self.parse_POST_request()
+			self.do_POST_delete_entries(self.path.split("/")[1])
+
+
 		# If we want to retransmit what we received to the other vessels
 		pass
 		retransmit = False # Like this, we will just create infinite loops!
@@ -238,6 +245,14 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		server.add_value_to_store(res['entry'][0])
 		self.wfile.write(json.dumps({"status": "OK"}))
 
+	def do_POST_delete_entries(self, id):
+		print("Receiving a DELETE on %s" % id)
+		server.delete_value_in_store(id)
+		print Entries
+
+	def do_POST_modify_entries(self, id):
+		pass
+
 #------------------------------------------------------------------------------------------------------
 # file i/o
 def read_file(filename):
@@ -248,6 +263,7 @@ def read_file(filename):
     opened_file.close()
     return all_content
 #------------------------------------------------------------------------------------------------------
+
 
 # Execute the code
 if __name__ == '__main__':
