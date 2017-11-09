@@ -216,10 +216,9 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		if self.path == "/board":
 			self.do_POST_Board()
 
-		elif self.path.startswith("/entries/"):
-			print self.parse_POST_request()
-			self.do_POST_delete_entries(self.path.split("/")[1])
-
+	 	elif self.path.startswith("/entries/"):
+			id = self.path.replace("/entries/", "")
+			self.do_UPDATE_entries(id)
 
 		# If we want to retransmit what we received to the other vessels
 		pass
@@ -239,6 +238,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 #------------------------------------------------------------------------------------------------------
 	# We might want some functions here as well
 #------------------------------------------------------------------------------------------------------
+	def do_UPDATE_entries(self,id):
+		self.set_HTTP_headers(200)
+		res = self.parse_POST_request()
+		print res
+		server.modify_value_in_store(id, res['entry'][0])
+		self.wfile.write(json.dumps({"status": "OK"}))
+
 	def do_POST_Board(self):
 		self.set_HTTP_headers(200)
 		res = self.parse_POST_request()

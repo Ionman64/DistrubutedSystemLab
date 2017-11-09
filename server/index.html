@@ -11,7 +11,7 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <!-- Inlined javascript code. This could be optionally hosted in another file on the server and included using 'src' attribute as above -->
 <script>
-	var page_reload_timeout = 2; //in seconds
+	var page_reload_timeout = 5; //in seconds
 var page_reload_count = 0;
 
 function update_contents(){
@@ -42,7 +42,7 @@ function load_board_ajax() {
 			$("#board-contents").empty();
 			$.each(data, function(key, value) {
 				var board_entry = el("section");
-				board_entry.id = "boardcontents_placeholder"; 
+				board_entry.id = "boardcontents_placeholder";
 				var boardtitle = el("section");
 				boardtitle.id = "boardtitle_placeholder";
 				boardtitle.className = "boardtitle";
@@ -212,10 +212,9 @@ footer {
 		        <input type="submit" value="Submit to board2"/>
 		    </form>
 		</section>
-    	<!-- The board contents come here -->	
+    	<!-- The board contents come here -->
 		<section id="board-contents">
-			
+
 		</section>
 	</body>
 </html>
-
