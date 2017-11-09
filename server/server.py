@@ -182,7 +182,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		#print entries
 		board = boardcontents_template % ("Banana Board", self.gen_entries_html()) # (boardtitle, entries)
 		#self.wfile.write(board)
-		Entries["he"] = "hello"
 		print(json.dumps(Entries))
 		self.wfile.write(json.dumps(Entries))
 
@@ -218,7 +217,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 			self.do_POST_Board()
 
 		elif self.path.startswith("/entries/"):
-			# {'entry': ['asdfasdf'], 'delete': ['1']}
 			print self.parse_POST_request()
 			self.do_POST_delete_entries(self.path.split("/")[1])
 
@@ -247,15 +245,27 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		server.add_value_to_store(res['entry'][0])
 		self.wfile.write(json.dumps({"status": "OK"}))
 
-	def do_POST_delete_entries(self, id):
-		print("Receiving a DELETE on %s" % id)
-		server.delete_value_in_store(id)
-		print Entries
-
-	def do_POST_modify_entries(self, id):
-		pass
-
+# Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
+	def do_DELETE(self):
+		print("Receiving a DELETE on %s" % self.path)
+
+		if self.path.startswith("/entries/"):
+			id = self.path.replace("/entries/", "")
+			self.do_DELETE_entries(id)
+
+#---------------------------------------------------------------------------------
+# DELETE Logic
+	def do_DELETE_entries(self, id):
+		self.set_HTTP_headers(200)
+		if len(id) == 0:
+			self.set_HTTP_headers(204)
+			self.wfile.write(json.dumps({"status": "Not Found"}))
+		else:
+			server.delete_value_in_store(id)
+			self.wfile.write(json.dumps({"status": "OK"}))
+
+#-------------------------------------
 # file i/o
 def read_file(filename):
     opened_file = open(filename, 'r')
