@@ -165,14 +165,17 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		#starting with static data.
 		entry1 = entry_template % ("entries/1", 1, "First message" )  # (action, id ,entry)
 		entry2 = entry_template % ("entries/2", 2, "Second message" )
-		html_response = entry1 + entry2
+		html_response = "%s%s" % (entry1, entry2)
 		self.wfile.write(html_response)
 
 
 	def do_GET_Board(self):
 		self.set_HTTP_headers(200)
 
-		entries = self.do_GET_Entries()
+		entry1 = entry_template % ("entries/1", 1, "First message" )  # (action, id ,entry)
+		entry2 = entry_template % ("entries/2", 2, "Second message" )
+		entries = "%s%s" % (entry1, entry2)
+		#print entries
 		board = boardcontents_template % ("My Board", entries) # (boardtitle, entries)
 		self.wfile.write(board)
 
