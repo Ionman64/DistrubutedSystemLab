@@ -57,6 +57,7 @@ function load_board_ajax() {
 				input.type = "text";
 				input.name = "entry";
 				input.value = value;
+				input.setAttribute("data-id", key);
 				input.style.size = "70%";
 				board_entry.appendChild(input);
 				var button = el("button");
@@ -100,7 +101,7 @@ function modify_ajax(id) {
 		method:"POST",
 		dataType:"JSON",
 		crossOrigin:true,
-		data: {"entry":$("#entry").val()},
+		data: {"entry":$("input[data-id='" + id + "']").val()},
 		sucess:function(data, status) {
 			page_reload_count++;
 			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
