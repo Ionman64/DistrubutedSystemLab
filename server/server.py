@@ -211,28 +211,37 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		# Here, we should check which path was requested and call the right logic based on it
 		# We should also parse the data received
 		# and set the headers for the client
+		PROPAGATE = "/propagate"
 
+		retransmit = True # Like this, we will just create infinite loops!
+		action = None
+
+		if self.path.startswith(PROPAGATE):
+			retransmit = False
+			action = self.path.split(PROPAGATE)[1]
 
 		if self.path == "/board":
-			self.do_POST_Board()
+
+			id = self.do_POST_Board()
+			retransmit(PROPAGATE + self.path, id, self.parse_POST_request()['entry'][0])
 
 	 	elif self.path.startswith("/entries/"):
 			id = self.path.replace("/entries/", "")
 			self.do_UPDATE_entries(id)
+			retransmit(PROPAGATE + self.path, id, self.parse_POST_request()['entry'][0])
 
 		# If we want to retransmit what we received to the other vessels
-		pass
-		retransmit = False # Like this, we will just create infinite loops!
-		if retransmit:
-			# do_POST send the message only when the function finishes
-			# We must then create threads if we want to do some heavy computation
-			#
-			# Random content
-			thread = Thread(target=self.server.propagate_value_to_vessels,args=("action", "key", "value") )
-			# We kill the process if we kill the server
-			thread.daemon = True
-			# We start the thread
-			thread.start()
+
+	def retransmit(self, action, key = None, value = None):
+		print "retransmitting to vessels"
+		parameters = self.parse_POST_request()
+		key = parameters['key'][0]
+		value = parameters['entry'][0]
+		thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, key, value))
+		# We kill the process if we kill the server
+		thread.daemon = True
+		# We start the thread
+		thread.start()
 #------------------------------------------------------------------------------------------------------
 # POST Logic
 #------------------------------------------------------------------------------------------------------
@@ -241,15 +250,15 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 	def do_UPDATE_entries(self,id):
 		self.set_HTTP_headers(200)
 		res = self.parse_POST_request()
-		print res
 		server.modify_value_in_store(id, res['entry'][0])
 		self.wfile.write(json.dumps({"status": "OK"}))
 
 	def do_POST_Board(self):
 		self.set_HTTP_headers(200)
 		res = self.parse_POST_request()
-		server.add_value_to_store(res['entry'][0])
+		id = server.add_value_to_store(res['entry'][0])
 		self.wfile.write(json.dumps({"status": "OK"}))
+		return id
 
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
