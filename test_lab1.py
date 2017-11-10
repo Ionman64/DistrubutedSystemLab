@@ -1,16 +1,27 @@
-import os
+import unittest
 import requests
-from lab1 import Lab1
-from lab1 import Lab1Topology
+import json
 
+class SimpleTestCase(unittest.TestCase):
 
+    def setUp(self):
+        """Call before every test case."""
 
-if __name__ == '__main__':
-    print "---starting test---"
-    # we set the log level to info, in order to display the server outputs as well
-    #setLogLevel( 'info' )
-    lab = Lab1()
-    lab.run()
-    r = requests.get("10.1.0.1:61001/board")
-    print r
-    print "---ending test---"
+    def tearDown(self):
+        """Call after every test case."""
+
+    def testA(self):
+        # Posting an entry to board check if it exists:
+        r = requests.get("http://10.1.0.1:61001/board")
+        assert r.status_code == 200
+
+        ENTRY_1 = "banana"
+        r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
+        assert r.status_code == 200
+
+        r = requests.get("http://10.1.0.1:61001/board")
+        data = json.loads(r.content)
+        print "r: %s" % data
+
+if __name__ == "__main__":
+    unittest.main() # run all tests

@@ -216,9 +216,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         if request_path == "/board":
             id = str(uuid.uuid4())
-            Entries[id] = parameters['entry'][0]
-            self.retransmit(request_path, "POST", id, parameters['entry'][0])
-            self.success_out()
+            entry_value = parameters['entry'][0]
+            Entries[id] = entry_value
+            self.retransmit(request_path, "POST", id, entry_value)
+            self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value}))
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
