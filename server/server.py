@@ -63,7 +63,7 @@ class BlackboardServer(HTTPServer):
         del Entries[key]
 #------------------------------------------------------------------------------------------------------
 # Contact a specific vessel with a set of variables to transmit to it
-    def contact_vessel(self, vessel_ip, path, key, value):
+    def contact_vessel(self, vessel_ip, path, action_type, key, value):
         # the Boolean variable we will return
         success = False
         # The variables must be encoded in the URL format, through urllib.urlencode
@@ -76,7 +76,7 @@ class BlackboardServer(HTTPServer):
             # We can set a timeout, after which the connection fails if nothing happened
             connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
             # We only use POST to send data (PUT and DELETE not supported)
-            action_type = "POST"
+            #action_type = "POST"
             # We send the HTTP request
             connection.request(action_type, path, post_content, headers)
             # We retrieve the response
@@ -96,7 +96,7 @@ class BlackboardServer(HTTPServer):
         return success
 #------------------------------------------------------------------------------------------------------
     # We send a received value to all the other vessels of the system
-    def propagate_value_to_vessels(self, path, key, value):
+    def propagate_value_to_vessels(self, path, action_type, key, value, ):
         # We iterate through the vessel list
         for vessel in self.vessels:
             # We should not send it to our own IP, or we would create an infinite loop of updates
@@ -104,7 +104,7 @@ class BlackboardServer(HTTPServer):
                 # A good practice would be to try again if the request failed
                 # Here, we do it only once
                 print "---> propagating to %s" % vessel
-                self.contact_vessel(vessel, path, key, value)
+                self.contact_vessel(vessel, path, action_type, key, value)
 #------------------------------------------------------------------------------------------------------
 
 
@@ -208,8 +208,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         PROPAGATE = "/propagate"
         request_path = self.path
         parameters = self.parse_POST_request()
-        print "--- parameters: %s" % parameters
-        print "--- Entries before post: %s" % Entries
+
         self.set_HTTP_headers(200)
 
         if request_path.startswith(PROPAGATE):
@@ -218,7 +217,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/board":
             id = str(uuid.uuid4())
             Entries[id] = parameters['entry'][0]
-            self.retransmit(request_path, id, parameters['entry'][0])
+            self.retransmit(request_path, "POST", id, parameters['entry'][0])
             self.success_out()
 
         elif request_path == "/propagate/board":
@@ -229,7 +228,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path.startswith("/entries/"):
             id = self.path.replace("/entries/", "")
             Entries[id] = parameters['entry'][0]
-            self.retransmit(request_path, id, parameters['entry'][0])
+            self.retransmit(request_path, "POST", id, parameters['entry'][0])
             self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
@@ -237,16 +236,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             Entries[id] = parameters['entry'][0]
             self.success_out()
 
-        print "--- Entries after post: %s" % Entries
-
-        # If we want to retransmit what we received to the other vessels
     def success_out(self):
             self.wfile.write(json.dumps({"status": "OK"}))
 
-    def retransmit(self, action, key = None, value = None):
+    def retransmit(self, action, action_type, key = None, value = None):
             action = ''.join(["/propagate", action])
             print "retransmitting to vessels on" + action
-            thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, key, value))
+            thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, action_type, key, value))
             # We kill the process if we kill the server
             thread.daemon = True
             # We start the thread
@@ -263,22 +259,37 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         print("Receiving a DELETE on %s" % self.path)
 
-        if self.path.startswith("/entries/"):
+        request_path = self.path
+        print "--- Entries before DELETE: %s" % Entries
+
+        if request_path.startswith("/entries/"):
             id = self.path.replace("/entries/", "")
-            self.do_DELETE_entries(id)
+            if id in Entries:
+                # Delete
+                self.set_HTTP_headers(200)
+                server.delete_value_in_store(id)
+                self.success_out()
+                self.retransmit(request_path, "DELETE", id)
+            else:
+                #return not found
+                self.set_HTTP_headers(404)
+                self.wfile.write(json.dumps({"status": "Not Found"}))
+
+        elif request_path.startswith("/propagate/entries/"):
+            id = self.path.replace("/propagate/entries/", "")
+            if id in Entries:
+                # Delete
+                self.set_HTTP_headers(200)
+                server.delete_value_in_store(id)
+                self.success_out()
+            else:
+                #return not found
+                self.set_HTTP_headers(404)
+                self.wfile.write(json.dumps({"status": "Not Found"}))
+
+        print "--- Entries after DELETE: %s" % Entries
 
 #---------------------------------------------------------------------------------
-# DELETE Logic
-    def do_DELETE_entries(self, id):
-        self.set_HTTP_headers(200)
-        if len(id) == 0:
-            self.set_HTTP_headers(204)
-            self.wfile.write(json.dumps({"status": "Not Found"}))
-        else:
-            server.delete_value_in_store(id)
-            self.wfile.write(json.dumps({"status": "OK"}))
-
-#-------------------------------------
 # file i/o
 def read_file(filename):
     curr_path = sys.path[0]
