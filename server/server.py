@@ -211,9 +211,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         self.set_HTTP_headers(200)
 
-        if request_path.startswith(PROPAGATE):
-            action = self.path.split(PROPAGATE)[1]
-
         if request_path == "/board":
             id = str(uuid.uuid4())
             entry_value = parameters['entry'][0]
