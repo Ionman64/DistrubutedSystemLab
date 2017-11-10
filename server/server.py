@@ -67,14 +67,14 @@ class BlackboardServer(HTTPServer):
         # the Boolean variable we will return
         success = False
         # The variables must be encoded in the URL format, through urllib.urlencode
-        post_content = urlencode({'key': key, 'value': value})
+        post_content = urlencode({'id': key, 'entry': value})
         # the HTTP header must contain the type of data we are transmitting, here URL encoded
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         # We should try to catch errors when contacting the vessel
         try:
             # We contact vessel:PORT_NUMBER since we all use the same port
             # We can set a timeout, after which the connection fails if nothing happened
-            connection = HTTPConnection("%s:%d" % (vessel, PORT_NUMBER), timeout = 30)
+            connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
             # We only use POST to send data (PUT and DELETE not supported)
             action_type = "POST"
             # We send the HTTP request
@@ -88,7 +88,7 @@ class BlackboardServer(HTTPServer):
                 success = True
         # We catch every possible exceptions
         except Exception as e:
-            print "Error while contacting %s" % vessel
+            print "Error while contacting %s" % vessel_ip
             # printing the error given by Python
             print(e)
 
@@ -103,6 +103,7 @@ class BlackboardServer(HTTPServer):
             if vessel != ("10.1.0.%s" % self.vessel_id):
                 # A good practice would be to try again if the request failed
                 # Here, we do it only once
+                print "---> propagating to %s" % vessel
                 self.contact_vessel(vessel, path, key, value)
 #------------------------------------------------------------------------------------------------------
 
@@ -145,7 +146,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
     # This function contains the logic executed when this server receives a GET request
     # This function is called AUTOMATICALLY upon reception and is executed as a thread!
     def do_GET(self):
-        print("Receiving a GET on path %s" % self.path)
+        #print("Receiving a GET on path %s" % self.path)
 
         # Here, we should check which path was requested and call the right logic based on it
         if self.path == "/board":
@@ -214,15 +215,15 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path.startswith(PROPAGATE):
             action = self.path.split(PROPAGATE)[1]
 
-        if request_path == "/board": 
+        if request_path == "/board":
             id = str(uuid.uuid4())
             Entries[id] = parameters['entry'][0]
             self.retransmit(request_path, id, parameters['entry'][0])
             self.success_out()
-            
+
         elif request_path == "/propagate/board":
-            id = parameters['key'][0]
-            Entries[id] = parameters['value'][0]
+            id = parameters['id'][0]
+            Entries[id] = parameters['entry'][0]
             self.success_out()
 
         elif request_path.startswith("/entries/"):
@@ -230,6 +231,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             Entries[id] = parameters['entry'][0]
             self.retransmit(request_path, id, parameters['entry'][0])
             self.success_out()
+
+        elif request_path.startswith("/propagate/entries/"):
+            id = self.path.replace("/propagate/entries/", "")
+            Entries[id] = parameters['entry'][0]
+            self.success_out()
+
         print "--- Entries after post: %s" % Entries
 
         # If we want to retransmit what we received to the other vessels
