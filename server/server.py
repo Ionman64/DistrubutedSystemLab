@@ -48,11 +48,9 @@ class BlackboardServer(HTTPServer):
 		self.vessels = vessel_list
 #------------------------------------------------------------------------------------------------------
 	# We add a value received to the store
-	def add_value_to_store(self, value):
+	def add_value_to_store(self, id, value):
 		# We add the value to the store
-		id =str(uuid.uuid4())
 		Entries[id] = value
-		return id
 #------------------------------------------------------------------------------------------------------
 	# We modify a value received in the store
 	def modify_value_in_store(self,key,value):
@@ -65,11 +63,11 @@ class BlackboardServer(HTTPServer):
 		del Entries[key]
 #------------------------------------------------------------------------------------------------------
 # Contact a specific vessel with a set of variables to transmit to it
-	def contact_vessel(self, vessel_ip, path, action, key, value):
+	def contact_vessel(self, vessel_ip, path, key, value):
 		# the Boolean variable we will return
 		success = False
 		# The variables must be encoded in the URL format, through urllib.urlencode
-		post_content = urlencode({'action': action, 'key': key, 'value': value})
+		post_content = urlencode({'key': key, 'value': value})
 		# the HTTP header must contain the type of data we are transmitting, here URL encoded
 		headers = {"Content-type": "application/x-www-form-urlencoded"}
 		# We should try to catch errors when contacting the vessel
@@ -98,14 +96,14 @@ class BlackboardServer(HTTPServer):
 		return success
 #------------------------------------------------------------------------------------------------------
 	# We send a received value to all the other vessels of the system
-	def propagate_value_to_vessels(self, path, action, key, value):
+	def propagate_value_to_vessels(self, path, key, value):
 		# We iterate through the vessel list
 		for vessel in self.vessels:
 			# We should not send it to our own IP, or we would create an infinite loop of updates
 			if vessel != ("10.1.0.%s" % self.vessel_id):
 				# A good practice would be to try again if the request failed
 				# Here, we do it only once
-				self.contact_vessel(vessel, path, action, key, value)
+				self.contact_vessel(vessel, path, key, value)
 #------------------------------------------------------------------------------------------------------
 
 
@@ -175,14 +173,9 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
 	def do_GET_Board(self):
 		self.set_HTTP_headers(200)
-
-		entry1 = entry_template % ("entries/1", 1, "First message" )  # (action, id ,entry)
-		entry2 = entry_template % ("entries/2", 2, "Second message" )
-		entries = "%s%s" % (entry1, entry2)
 		#print entries
 		board = boardcontents_template % ("Banana Board", self.gen_entries_html()) # (boardtitle, entries)
 		#self.wfile.write(board)
-		print(json.dumps(Entries))
 		self.wfile.write(json.dumps(Entries))
 
 
@@ -212,53 +205,43 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 		# We should also parse the data received
 		# and set the headers for the client
 		PROPAGATE = "/propagate"
+		request_path = self.path
+		parameters = self.parse_POST_request()
+		self.set_HTTP_headers(200)
 
-		retransmit = True # Like this, we will just create infinite loops!
-		action = None
-
-		if self.path.startswith(PROPAGATE):
-			retransmit = False
+		if request_path.startswith(PROPAGATE):
 			action = self.path.split(PROPAGATE)[1]
 
-		if self.path == "/board":
+		if request_path == "/board":
+			id = str(uuid.uuid4())
+			Entries[id] = parameters['entry'][0]
+			self.retransmit(request_path, id, parameters['entry'][0])
+			self.success_out()
 
-			id = self.do_POST_Board()
-			retransmit(PROPAGATE + self.path, id, self.parse_POST_request()['entry'][0])
-
-	 	elif self.path.startswith("/entries/"):
+	 	elif request_path.startswith("/entries/"):
 			id = self.path.replace("/entries/", "")
-			self.do_UPDATE_entries(id)
-			retransmit(PROPAGATE + self.path, id, self.parse_POST_request()['entry'][0])
+			Entries[id] = parameters['entry'][0]
+			self.retransmit(request_path, id, parameters['entry'][0])
+			self.success_out()
 
 		# If we want to retransmit what we received to the other vessels
+	def success_out(self):
+    		self.wfile.write(json.dumps({"status": "OK"}))
 
 	def retransmit(self, action, key = None, value = None):
-		print "retransmitting to vessels"
-		parameters = self.parse_POST_request()
-		key = parameters['key'][0]
-		value = parameters['entry'][0]
-		thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, key, value))
-		# We kill the process if we kill the server
-		thread.daemon = True
-		# We start the thread
-		thread.start()
+			action = ''.join(["/propagate", action])
+			print "retransmitting to vessels on" + action
+			thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, key, value))
+			# We kill the process if we kill the server
+			thread.daemon = True
+			# We start the thread
+			thread.start()
 #------------------------------------------------------------------------------------------------------
 # POST Logic
 #------------------------------------------------------------------------------------------------------
 	# We might want some functions here as well
 #------------------------------------------------------------------------------------------------------
-	def do_UPDATE_entries(self,id):
-		self.set_HTTP_headers(200)
-		res = self.parse_POST_request()
-		server.modify_value_in_store(id, res['entry'][0])
-		self.wfile.write(json.dumps({"status": "OK"}))
-
-	def do_POST_Board(self):
-		self.set_HTTP_headers(200)
-		res = self.parse_POST_request()
-		id = server.add_value_to_store(res['entry'][0])
-		self.wfile.write(json.dumps({"status": "OK"}))
-		return id
+		
 
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
