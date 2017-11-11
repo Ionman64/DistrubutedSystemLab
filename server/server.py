@@ -290,15 +290,28 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # and set the headers for the client
         request_path = self.path
         parameters = self.parse_POST_request()
-
+        print "parameters: %s" % parameters
         self.set_HTTP_headers(200)
 
         if request_path == "/board":
-            id = str(uuid.uuid4())
-            entry_value = parameters['entry'][0]
-            self.server.Entries[id] = entry_value
-            self.retransmit(request_path, "POST", id, entry_value)
-            self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value}))
+            #here we will apply a timestamp to the entry only if we are the leader. After the request has been dealth with we will return our timestamp to the calling node so that he can update his board order. we also need to add a new entry point that allows nodes to obtain the full board with the order and timestamps.
+            if 'id' in parameters:
+                id = parameters['id'][0] # post passed on from non-leader
+            else:
+                id = str(uuid.uuid4())
+
+            entry_value = dict.fromkeys(['text', 'timestamp'])
+            entry_value['text'] = parameters['entry'][0]
+            
+            if self.server.vessel_id == self.server.leader:
+                entry_value['timestamp'] = time.time()
+                self.server.Entries[id] = entry_value
+                self.retransmit(request_path, "POST", id, entry_value)
+                self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
+            else :
+                # pass along post to leader
+                self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry_value)
+                self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value}))
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
