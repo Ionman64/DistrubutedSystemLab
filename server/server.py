@@ -262,7 +262,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
         temp_entries = {}
         for item in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
-            temp_entries[item.id] = item
+            print "IT:%s:" % item
+            temp_entries[item['id']] = item
         self.wfile.write(json.dumps(temp_entries))
 
 
@@ -324,12 +325,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 print "--not leader"
                 #I am not the leader
                 # pass along post to leader
-                self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
+                self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry)
 
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
-            self.server.Entries[id] = parameters['entry'][0]
+            self.server.Entries[id] = json.loads(parameters['entry'][0])
             self.success_out()
 
         elif request_path.startswith("/entries/"):
@@ -438,6 +439,7 @@ def read_file(filename):
 #------------------------------------------------------------------------------------------------------
 
 def return_entry_timestamp(entry):
+    print "E: %s" % entry
     if 'timestamp' not in entry:
         print ("Timestamp missing in;")
         print entry
