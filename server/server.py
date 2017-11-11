@@ -261,8 +261,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 return
             entry = parameters['entry'][0]
             if 'id' not in keys:
+                # generate id if not provided (new entry)
                 id = str(uuid.uuid4())
             else:
+                # get from parameters (modified entry)
                 id = parameters['id'][0]
             entry_response = {}
             self.success_out()
@@ -282,6 +284,14 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #I am not the leader
                 # pass along post to leader
                 self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry)
+
+        #  Cost of post delivered to all nodes:
+        #
+        #   Upon a post event to a vessel:
+        #   first retransmit to leader. (1)
+        #   (all messages contain only one entry i.e payload = 1)
+        #   then propagation from leader to all other vessels. (N-1)
+        #   Cost for post = N = number of vessels
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
@@ -437,4 +447,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         server.server_close()
         print("Stopping Server")
-#------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------
