@@ -126,7 +126,7 @@ class BlackboardServer(HTTPServer):
         # the Boolean variable we will return
         success = False
         # The variables must be encoded in the URL format, through urllib.urlencode
-        post_content = urlencode({id:value})
+        post_content = urlencode({key:value})
         # the HTTP header must contain the type of data we are transmitting, here URL encoded
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         # We should try to catch errors when contacting the vessel
@@ -294,7 +294,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         elif request_path == ("/ELECTION"):
             print "/ELECTION endpoint hit"
-            thread = Thread(target=self.election,args=(parameters["election_table"][0]))
+            thread = Thread(target=self.election,args=([parameters["election_table"][0]]))
             # We kill the process if we kill the server
             thread.daemon = True
             # We start the thread
@@ -320,16 +320,17 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 print ("Election over")
                 server.finger_table = their_finger_table
                 leader = their_finger_table[sorted(their_finger_table)[0]]
-                print ("The leader is %s" % leader)  
-                #when our own id is in the fingertable we can assume that the election has 
-                # reached all nodes (e.g. gone full circle, one round)  
-                # We then select the leader with the lowest key  
-            else:   
-                print ("Sending Vote")                                                                  
+                print ("The leader is %s" % leader)
+                #when our own id is in the fingertable we can assume that the election has
+                # reached all nodes (e.g. gone full circle, one round)
+                # We then select the leader with the lowest key
+
+            else:
+                print ("Sending Vote")
                 their_finger_table[server.identifier] = server.get_ip_address()
                 server.contact_vessel_for_election(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
-            self.success_out()
-            
+
+
 #------------------------------------------------------------------------------------------------------
 # POST Logic
 #------------------------------------------------------------------------------------------------------
