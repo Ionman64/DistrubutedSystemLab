@@ -348,7 +348,9 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             thread.start()
 
     def success_out(self):
+            self.set_HTTP_headers(200)
             self.wfile.write(json.dumps({"status": "OK"}))
+            self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
             action = ''.join(["/propagate", action])
@@ -397,7 +399,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = self.path.replace("/entries/", "")
             if id in self.server.Entries:
                 # Delete
-                self.set_HTTP_headers(200)
                 self.server.delete_value_in_store(id)
                 self.success_out()
                 self.retransmit(request_path, "DELETE", id)
@@ -410,7 +411,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = self.path.replace("/propagate/entries/", "")
             if id in self.server.Entries:
                 # Delete
-                self.set_HTTP_headers(200)
                 self.server.delete_value_in_store(id)
                 self.success_out()
             else:
