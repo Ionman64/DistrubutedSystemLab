@@ -335,7 +335,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         elif request_path.startswith("/entries/"):
             id = self.path.replace("/entries/", "")
-            self.server.Entries[id] = parameters['entry'][0]
+            self.server.Entries[id]['text'] = parameters['entry'][0]
             self.retransmit(request_path, "POST", id, parameters['entry'][0])
             self.success_out()
 

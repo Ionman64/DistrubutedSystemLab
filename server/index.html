@@ -40,8 +40,8 @@ function load_board_ajax() {
 				%s
 			</div>*/
 			$("#board-contents").empty();
-			$.each(data, function(key, value) {
-				var item = JSON.parse(value);
+			$.each(data, function(key, item) {
+				console.log("item:" + item);
 				var board_entry = el("section");
 				board_entry.id = "boardcontents_placeholder";
 				var boardtitle = el("section");
