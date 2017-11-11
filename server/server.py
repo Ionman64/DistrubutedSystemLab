@@ -45,13 +45,19 @@ class BlackboardServer(HTTPServer):
         # We keep a variable of the next id to insert
         self.current_key = -1
         # our own ID (IP is 10.1.0.ID)
-        self.vessel_id = vessel_id
+        self.vessel_id = node_id
         # The list of other vessels
         self.vessels = vessel_list
         self.identifier = str(uuid.uuid4())
         self.finger_table = {self.identifier:self.get_ip_address()}
-        self.initiateElection()
+        if len(vessel_list) > 1:
+            self.initiateElection()
 #------------------------------------------------------------------------------------------------------
+    # Closes socket before shutdown so it can be reused in tests.
+    def shutdown(self):
+        self.socket.close()
+        HTTPServer.shutdown(self)
+
     # We add a value received to the store
     def add_value_to_store(self, id, value):
         # We add the value to the store
@@ -180,6 +186,11 @@ class BlackboardServer(HTTPServer):
 # Attributes of the server are SHARED accross all request hqndling/ threads!
 class BlackboardRequestHandler(BaseHTTPRequestHandler):
 #------------------------------------------------------------------------------------------------------
+
+    # Disable logging
+    def log_message(self, format, *args):
+        return
+
     # We fill the HTTP headers
     def set_HTTP_headers(self, status_code = 200):
          # We set the response status code (200 if OK, something else otherwise)
@@ -233,9 +244,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        #print entries
-        board = boardcontents_template % ("Banana Board", self.gen_entries_html()) # (boardtitle, entries)
-        #self.wfile.write(board)
         self.wfile.write(json.dumps(Entries))
 
 
@@ -344,14 +352,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         print("Receiving a DELETE on %s" % self.path)
 
         request_path = self.path
-        print "--- Entries before DELETE: %s" % Entries
 
         if request_path.startswith("/entries/"):
             id = self.path.replace("/entries/", "")
             if id in Entries:
                 # Delete
                 self.set_HTTP_headers(200)
-                server.delete_value_in_store(id)
+                self.server.delete_value_in_store(id)
                 self.success_out()
                 self.retransmit(request_path, "DELETE", id)
             else:
@@ -364,16 +371,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if id in Entries:
                 # Delete
                 self.set_HTTP_headers(200)
-                server.delete_value_in_store(id)
+                self.server.delete_value_in_store(id)
                 self.success_out()
             else:
                 #return not found
                 self.set_HTTP_headers(404)
                 self.wfile.write(json.dumps({"status": "Not Found"}))
-
-        print "--- Entries after DELETE: %s" % Entries
-
-
 
 #---------------------------------------------------------------------------------
 # file i/o
