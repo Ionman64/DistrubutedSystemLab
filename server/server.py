@@ -260,7 +260,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True) 
+        self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True)
         self.wfile.write(json.dumps(self.server.Entries))
 
 
@@ -299,7 +299,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = None
             entry = None
             if 'entry' not in keys:
-                self.wfile.write(json.dumps("success":False, "reason":"No entry parameter"))
+                self.wfile.write(json.dumps({"success":False, "reason":"No entry parameter"}))
                 return
             entry = parameters['entry'][0]
             if 'id' not in keys:
@@ -312,16 +312,16 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #I am the leader
                 entry_response['id'] = id
                 entry_response['timestamp'] = time.time()
-                entry_response['text'] = entry 
+                entry_response['text'] = entry
                 self.server.Entries[id] = entry_response
                 self.retransmit(request_path, "POST", id, json.dumps(entry_response))
-                success_out():
+                self.success_out()
                 #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
                 #I am not the leader
-                # pass along post to leader 
+                # pass along post to leader
                 self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
-                success_out()
+                self.success_out()
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
