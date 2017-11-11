@@ -215,14 +215,16 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 entry_response = self.server.Entries[id]
             else:
                 #post is new, apply a timestamp to order the entry.
-                entry_response = {'id':id, 'timestamp': self.server.tick(), 'text':entry, 'pid': self.get_ip_address(), 'vc': self.server.vclock}
+                entry_response = {'id':id, 'timestamp': self.server.tick(), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
                 self.server.Entries[id] = entry_response
             self.retransmit(request_path, "POST", id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
-            pid = parameters['pid']
-            incoming_vclock = parameters['vc']
-            if(incoming_vclock[pid] != self.vclock[pid] + 1):
+            content = parameters['entry'][0]
+            print "content>> %s" % content
+            pid = content['pid']
+            incoming_vclock = content['vc']
+            if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
                 # not in order, put in buffer
                 print "putting in buffer"
             else:
