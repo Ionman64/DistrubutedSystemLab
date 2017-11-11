@@ -260,10 +260,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        temp_entries = {}
+        temp_entries = []
         for item in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
             print "IT:%s:" % item
-            temp_entries[item['id']] = item
+            temp_entries.append(item['text'])
         self.wfile.write(json.dumps(temp_entries))
 
 
