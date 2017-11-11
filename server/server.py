@@ -31,17 +31,13 @@ IP_ADDRESS_PREFIX = "10.1.0."
 PORT_NUMBER = 61001
 #------------------------------------------------------------------------------------------------------
 
-Entries = {}
-
-#------------------------------------------------------------------------------------------------------
-#------------------------------------------------------------------------------------------------------
 class BlackboardServer(HTTPServer):
 #------------------------------------------------------------------------------------------------------
     def __init__(self, server_address, handler, node_id, vessel_list):
     # We call the super init
         HTTPServer.__init__(self,server_address, handler)
         # we create the dictionary of values
-        self.store = {}
+        self.Entries = {}
         # We keep a variable of the next id to insert
         self.current_key = -1
         # our own ID (IP is 10.1.0.ID)
@@ -59,19 +55,29 @@ class BlackboardServer(HTTPServer):
         HTTPServer.shutdown(self)
 
     # We add a value received to the store
-    def add_value_to_store(self, id, value):
+    def add_value_to_store(self, key, value):
         # We add the value to the store
-        Entries[id] = value
+        self.Entries[key] = value
 #------------------------------------------------------------------------------------------------------
     # We modify a value received in the store
     def modify_value_in_store(self,key,value):
         # we modify a value in the store if it exists
-        Entries[key] = value
+        self.Entries[key] = value
 #------------------------------------------------------------------------------------------------------
     # We delete a value received from the store
     def delete_value_in_store(self,key):
         # we delete a value in the store if it exists
-        del Entries[key]
+        del self.Entries[key]
+
+    def get_all_entries(self):
+        return self.Entries
+
+    def get_entry_from_store(self, key):
+        return self.Entries[key]
+
+    def clear_store(self):
+        self.Entries.clear()
+
 
     def initiateElection(self):
         thread = Thread(target=self.election)
@@ -238,13 +244,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def gen_entries_html(self):
         html_response = ""
-        for key, value in Entries.iteritems():
+        for key, value in self.server.Entries.iteritems():
             html_response += entry_template % ("entries/", key, value )
         return html_response
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        self.wfile.write(json.dumps(Entries))
+        self.wfile.write(json.dumps(self.server.Entries))
 
 
     def do_GET_Index(self):
@@ -280,24 +286,24 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/board":
             id = str(uuid.uuid4())
             entry_value = parameters['entry'][0]
-            Entries[id] = entry_value
+            self.server.Entries[id] = entry_value
             self.retransmit(request_path, "POST", id, entry_value)
             self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value}))
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
-            Entries[id] = parameters['entry'][0]
+            self.server.Entries[id] = parameters['entry'][0]
             self.success_out()
 
         elif request_path.startswith("/entries/"):
             id = self.path.replace("/entries/", "")
-            Entries[id] = parameters['entry'][0]
+            self.server.Entries[id] = parameters['entry'][0]
             self.retransmit(request_path, "POST", id, parameters['entry'][0])
             self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
-            Entries[id] = parameters['entry'][0]
+            self.server.Entries[id] = parameters['entry'][0]
             self.success_out()
 
         elif request_path == ("/ELECTION"):
@@ -355,7 +361,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         if request_path.startswith("/entries/"):
             id = self.path.replace("/entries/", "")
-            if id in Entries:
+            if id in self.server.Entries:
                 # Delete
                 self.set_HTTP_headers(200)
                 self.server.delete_value_in_store(id)
@@ -368,7 +374,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
-            if id in Entries:
+            if id in self.server.Entries:
                 # Delete
                 self.set_HTTP_headers(200)
                 self.server.delete_value_in_store(id)
