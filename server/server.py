@@ -260,7 +260,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True)
+        #self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True)
         self.wfile.write(json.dumps(self.server.Entries))
 
 
@@ -307,7 +307,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 id = parameters['id'][0]
             #here we will apply a timestamp to the entry only if we are the leader. After the request has been dealth with we will return our timestamp to the calling node so that he can update his board order. we also need to add a new entry point that allows nodes to obtain the full board with the order and timestamps.
             entry_response = {}
-            if self.server.vessel_id == self.server.leader:
+            self.success_out()
+            print "--leader leader: %s , vessel:%s" % (self.server.leader, self.server.vessel_id)
+            if ("10.1.0.%d" % self.server.vessel_id) == self.server.leader:
+
                 #I am the leader
                 entry_response['id'] = id
                 entry_response['timestamp'] = time.time()
@@ -316,10 +319,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.retransmit(request_path, "POST", id, json.dumps(entry_response))
                 #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
+                print "--not leader"
                 #I am not the leader
                 # pass along post to leader
                 self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
-            self.success_out()
+
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
@@ -348,12 +352,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
     def success_out(self):
             self.set_HTTP_headers(200)
             self.wfile.write(json.dumps({"status": "OK"}))
-            #self.wfile.close()
-    
-     def error_out(self, reason=None, header=200):
+            self.wfile.close()
+
+    def error_out(self, reason=None, header=200):
             self.set_HTTP_headers(header)
             self.wfile.write(json.dumps({"status": "FAIL", "reason":reason}))
-            #self.wfile.close()
+            self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
             action = ''.join(["/propagate", action])
