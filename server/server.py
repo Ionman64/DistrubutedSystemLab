@@ -186,7 +186,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # Here, we should check which path was requested and call the right logic based on it
         # We should also parse the data received
         # and set the headers for the client
-        self.server.print_vclock()
         request_path = self.path
         parameters = self.parse_POST_request()
         print("Receiving a POST on %s" % self.path)
@@ -224,11 +223,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "content>> %s" % json.dumps(content)
             sender = content['pid']
             incoming_vclock = content['vc']
-            for pid in incoming_vclock.keys():
-                if pid != self.server.get_ip_address():
-                    if self.server.vclock[pid] < incoming_vclock[pid]:
-                        self.server.vclock[pid] = incoming_vclock[pid]
-                        print ("Updated my clock for %s to %s" % pid, incoming_vclock[pid])
+            self.server.update_clock(incoming_vclock)
+            self.server.print_vclock()
             #if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
                 # not in order, put in buffer
             #    print "putting in buffer"
