@@ -207,15 +207,22 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         PROPAGATE = "/propagate"
         request_path = self.path
         parameters = self.parse_POST_request()
+        print "--- parameters: %s" % parameters
+        print "--- Entries before post: %s" % Entries
         self.set_HTTP_headers(200)
 
         if request_path.startswith(PROPAGATE):
             action = self.path.split(PROPAGATE)[1]
 
-        if request_path == "/board":
+        if request_path == "/board": 
             id = str(uuid.uuid4())
             Entries[id] = parameters['entry'][0]
             self.retransmit(request_path, id, parameters['entry'][0])
+            self.success_out()
+            
+        elif request_path == "/propagate/board":
+            id = parameters['key'][0]
+            Entries[id] = parameters['value'][0]
             self.success_out()
 
         elif request_path.startswith("/entries/"):
@@ -223,6 +230,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             Entries[id] = parameters['entry'][0]
             self.retransmit(request_path, id, parameters['entry'][0])
             self.success_out()
+        print "--- Entries after post: %s" % Entries
 
         # If we want to retransmit what we received to the other vessels
     def success_out(self):
