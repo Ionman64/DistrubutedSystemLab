@@ -19,6 +19,7 @@ class SimpleTestCase(unittest.TestCase):
         ENTRY_1 = "banana"
         r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
         data = json.loads(r.content)
+        print data
         POST_ID = data.id
         assert r.status_code == 200
         #modify
@@ -35,6 +36,7 @@ class SimpleTestCase(unittest.TestCase):
         ENTRY_1 = "banana"
         r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
         data = json.loads(r.content)
+        print data
         POST_ID = data.id
         assert r.status_code == 200
         #modify
