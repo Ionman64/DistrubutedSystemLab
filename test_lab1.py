@@ -38,7 +38,7 @@ class SimpleTestCase(unittest.TestCase):
         POST_ID = data["id"]
         assert r.status_code == 200
 
-        r = requests.delete("http://10.1.0.1:61001/board" + "/" + POST_ID)
+        r = requests.delete("http://10.1.0.1:61001/board/%s" % POST_ID)
         assert r.status_code == 200
         
 if __name__ == "__main__":
