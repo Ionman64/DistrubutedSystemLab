@@ -18,13 +18,14 @@ class SimpleTestCase(unittest.TestCase):
     def testEntryAndModify(self):
         ENTRY_1 = "banana"
         r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
-        data = json.loads(r.content)
+        data = json.loads(r.text)
+        print data
         POST_ID = data["id"]
         assert r.status_code == 200
         #modify
         ENTRY_1 = "apple"
         r = requests.post("http://10.1.0.1:61001/board" + "/" + POST_ID, data={'entry': ENTRY_1})
-        data = json.loads(r.content)
+        data = json.loads(r.text)
         assert r.status_code == 200
     def testEntry(self):
         # Posting an entry to board check if it exists:
@@ -34,7 +35,7 @@ class SimpleTestCase(unittest.TestCase):
     def testDelete(self):
         ENTRY_1 = "banana"
         r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
-        data = json.loads(r.content)
+        data = json.loads(r.text)
         print data
         POST_ID = data["id"]
         assert r.status_code == 200
