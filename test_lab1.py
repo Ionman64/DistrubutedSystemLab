@@ -25,6 +25,7 @@ class SimpleTestCase(unittest.TestCase):
         #modify
         ENTRY_1 = "apple"
         r = requests.post("http://10.1.0.1:61001/board" + "/" + POST_ID, data={'entry': ENTRY_1})
+        print r
         data = json.loads(r.text)
         assert r.status_code == 200
     def testEntry(self):
@@ -33,14 +34,12 @@ class SimpleTestCase(unittest.TestCase):
         r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
         assert r.status_code == 200
     def testDelete(self):
-        ENTRY_1 = "banana"
-        r = requests.post("http://10.1.0.1:61001/board", data={'entry': ENTRY_1})
+        r = requests.post("http://10.1.0.1:61001/board", data={'entry': "banana"})
         data = json.loads(r.text)
         print data
         POST_ID = data["id"]
         assert r.status_code == 200
-        #modify
-        ENTRY_1 = "apple"
+
         r = requests.delete("http://10.1.0.1:61001/board" + "/" + POST_ID)
         assert r.status_code == 200
         
