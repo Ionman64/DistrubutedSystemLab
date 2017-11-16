@@ -264,23 +264,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path == ("/ELECTION"):
             print "/ELECTION endpoint hit"
             their_finger_table = json.loads(parameters["entry"][0])
-            if server.identifier in their_finger_table.keys():
-                server.finger_table = their_finger_table
-                leader = their_finger_table[sorted(their_finger_table)[0]]
-                print ("The leader is %s" % leader)  
-                #when our own id is in the fingertable we can assume that the election has 
-                # reached all nodes (e.g. gone full circle, one round)  
-                # We then select the leader with the lowest key  
-            else:                                                                     
-                their_finger_table[server.identifier] = server.get_ip_address()
-                server.contact_vessel(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
-
-            # if full circle
-
-            # else: pass it on
-            #contact_vessel()
-
-            self.success_out()
+            thread = Thread(target=self.election,args=(their_finger_table))
+            # We kill the process if we kill the server
+            thread.daemon = True
+            # We start the thread
+            thread.start()
 
     def success_out(self):
             self.wfile.write(json.dumps({"status": "OK"}))
@@ -293,6 +281,24 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             thread.daemon = True
             # We start the thread
             thread.start()
+
+    def election(self, their_finger_table):
+            print "handling election"
+            print str(their_finger_table)
+            if server.identifier in their_finger_table.keys():
+                print ("Election over")
+                server.finger_table = their_finger_table
+                leader = their_finger_table[sorted(their_finger_table)[0]]
+                print ("The leader is %s" % leader)  
+                #when our own id is in the fingertable we can assume that the election has 
+                # reached all nodes (e.g. gone full circle, one round)  
+                # We then select the leader with the lowest key  
+            else:   
+                print ("Sending Vote")                                                                  
+                their_finger_table[server.identifier] = server.get_ip_address()
+                server.contact_vessel(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
+            self.success_out()
+            
 #------------------------------------------------------------------------------------------------------
 # POST Logic
 #------------------------------------------------------------------------------------------------------
