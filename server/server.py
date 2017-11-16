@@ -49,7 +49,7 @@ class BlackboardServer(HTTPServer):
         # The list of other vessels
         self.vessels = vessel_list
         self.identifier = str(uuid.uuid4())
-        self.finger_table = {self.identifier:(IP_ADDRESS_PREFIX + self.vessel_id)}
+        self.finger_table = {self.identifier:self.get_ip_address()}
         self.initiateElection()
 #------------------------------------------------------------------------------------------------------
     # We add a value received to the store
@@ -76,6 +76,9 @@ class BlackboardServer(HTTPServer):
 
     def find_neighbour(self):
         return "%s%d" % (IP_ADDRESS_PREFIX, (self.vessel_id % len(self.vessels)+1))
+
+    def get_ip_address(self):
+        return IP_ADDRESS_PREFIX + str(self.vessel_id)
 
 #---------------------------------------------------------------------------------
 # LAB 2 election
@@ -125,7 +128,7 @@ class BlackboardServer(HTTPServer):
         # We iterate through the vessel list
         for vessel in self.vessels:
             # We should not send it to our own IP, or we would create an infinite loop of updates
-            if vessel != (IP_ADDRESS_PREFIX + ("%s" % self.vessel_id)):
+            if vessel != self.get_ip_address():
                 # A good practice would be to try again if the request failed
                 # Here, we do it only once
                 print "---> propagating to %s" % vessel
@@ -269,7 +272,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 # reached all nodes (e.g. gone full circle, one round)  
                 # We then select the leader with the lowest key  
             else:                                                                     
-                their_finger_table[server.identifier] = (IP_ADDRESS_PREFIX + ("%d" % self.vessel_id))
+                their_finger_table[server.identifier] = server.get_ip_address()
                 server.contact_vessel(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
 
             # if full circle
