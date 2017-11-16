@@ -223,7 +223,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # Here, we should check which path was requested and call the right logic based on it
         # We should also parse the data received
         # and set the headers for the client
-        PROPAGATE = "/propagate"
         request_path = self.path
         parameters = self.parse_POST_request()
 
@@ -250,6 +249,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
             Entries[id] = parameters['entry'][0]
+            self.success_out()
+
+        elif request_path == ("/ELECTION"):
+            print "/ELECTION endpoint hit"
+            print "params: %s" % parameters
             self.success_out()
 
     def success_out(self):
@@ -304,8 +308,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "Not Found"}))
 
         print "--- Entries after DELETE: %s" % Entries
-        
-        
+
+
 
 #---------------------------------------------------------------------------------
 # file i/o
@@ -318,7 +322,7 @@ def read_file(filename):
     opened_file.close()
     return all_content
 #------------------------------------------------------------------------------------------------------
-            
+
 
 # Execute the code
 if __name__ == '__main__':
