@@ -27,6 +27,7 @@ entry_template = ""
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
+IP_ADDRESS_PREFIX = "10.1.0."
 PORT_NUMBER = 61001
 #------------------------------------------------------------------------------------------------------
 
@@ -47,6 +48,8 @@ class BlackboardServer(HTTPServer):
         self.vessel_id = vessel_id
         # The list of other vessels
         self.vessels = vessel_list
+        self.identifier = str(uuid.uuid4())
+        self.finger_table = {self.identifier:(IP_ADDRESS_PREFIX + self.vessel_id)}
         self.initiateElection()
 #------------------------------------------------------------------------------------------------------
     # We add a value received to the store
@@ -71,13 +74,18 @@ class BlackboardServer(HTTPServer):
         # We start the thread
         thread.start()
 
+    def find_neighbour(self):
+        return "%s%d" % (IP_ADDRESS_PREFIX, (self.vessel_id % len(self.vessels)+1))
+
 #---------------------------------------------------------------------------------
 # LAB 2 election
     def election(self):
+        if len(self.vessels) == 0:
+            return
         time.sleep(1)
         print ("Initiating Election")
-            if vessel != ("10.1.0.%s" % self.vessel_id):
-                self.contact_vessel(vessel, "/ELECTION", "POST", "votes", json.dumps({"id":self.vessel_id}))
+        print ("I am %s and my neighbour is %s" % (self.vessel_id, (self.vessel_id % len(self.vessels)) +1))
+        self.contact_vessel(self.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(self.finger_table))
 #------------------------------------------------------------------------------------------------------
 # Contact a specific vessel with a set of variables to transmit to it
     def contact_vessel(self, vessel_ip, path, action_type, key, value):
@@ -117,7 +125,7 @@ class BlackboardServer(HTTPServer):
         # We iterate through the vessel list
         for vessel in self.vessels:
             # We should not send it to our own IP, or we would create an infinite loop of updates
-            if vessel != ("10.1.0.%s" % self.vessel_id):
+            if vessel != (IP_ADDRESS_PREFIX + ("%s" % self.vessel_id)):
                 # A good practice would be to try again if the request failed
                 # Here, we do it only once
                 print "---> propagating to %s" % vessel
@@ -252,12 +260,22 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         elif request_path == ("/ELECTION"):
             print "/ELECTION endpoint hit"
-            print "params: %s" % parameters
+            their_finger_table = json.loads(parameters["entry"][0])
+            if server.identifier in their_finger_table:
+                server.finger_table = their_finger_table
+                leader = their_finger_table[sorted(their_finger_table)[0]]
+                print ("The leader is %s" % leader)  
+                #when our own id is in the fingertable we can assume that the election has 
+                # reached all nodes (e.g. gone full circle, one round)  
+                # We then select the leader with the lowest key  
+            else:                                                                     
+                their_finger_table[server.identifier] = (IP_ADDRESS_PREFIX + ("%d" % self.vessel_id))
+                server.contact_vessel(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
 
             # if full circle
 
             # else: pass it on
-                contact_vessel()
+            #contact_vessel()
 
             self.success_out()
 
@@ -349,7 +367,7 @@ if __name__ == '__main__':
         vessel_id = int(sys.argv[1])
         # We need to write the other vessels IP, based on the knowledge of their number
         for i in range(1, int(sys.argv[2])+1):
-            vessel_list.append("10.1.0.%d" % i) # We can add ourselves, we have a test in the propagation
+            vessel_list.append(IP_ADDRESS_PREFIX + ("%d" % i)) # We can add ourselves, we have a test in the propagation
 
     # We launch a server
     server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
