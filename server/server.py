@@ -16,6 +16,7 @@ from codecs import open # Open a file
 from threading import  Thread # Thread Management
 import uuid
 import json
+import time
 #------------------------------------------------------------------------------------------------------
 
 # Global variables for HTML templates
@@ -46,6 +47,7 @@ class BlackboardServer(HTTPServer):
         self.vessel_id = vessel_id
         # The list of other vessels
         self.vessels = vessel_list
+        self.initiateElection()
 #------------------------------------------------------------------------------------------------------
     # We add a value received to the store
     def add_value_to_store(self, id, value):
@@ -61,6 +63,22 @@ class BlackboardServer(HTTPServer):
     def delete_value_in_store(self,key):
         # we delete a value in the store if it exists
         del Entries[key]
+
+    def initiateElection(self):
+        thread = Thread(target=self.election)
+        # We kill the process if we kill the server
+        thread.daemon = True
+        # We start the thread
+        thread.start()
+
+#---------------------------------------------------------------------------------
+# LAB 2 election
+    def election(self):
+        time.sleep(1)
+        print ("Initiating Election")
+        for vessel in self.vessels:
+            if vessel != ("10.1.0.%s" % self.vessel_id):
+                self.contact_vessel(vessel, "/ELECTION", "POST", "votes", json.dumps({"id":self.vessel_id}))
 #------------------------------------------------------------------------------------------------------
 # Contact a specific vessel with a set of variables to transmit to it
     def contact_vessel(self, vessel_ip, path, action_type, key, value):
@@ -286,6 +304,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "Not Found"}))
 
         print "--- Entries after DELETE: %s" % Entries
+        
+        
 
 #---------------------------------------------------------------------------------
 # file i/o
@@ -298,7 +318,7 @@ def read_file(filename):
     opened_file.close()
     return all_content
 #------------------------------------------------------------------------------------------------------
-
+            
 
 # Execute the code
 if __name__ == '__main__':
