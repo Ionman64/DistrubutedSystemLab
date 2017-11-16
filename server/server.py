@@ -88,7 +88,7 @@ class BlackboardServer(HTTPServer):
         time.sleep(1)
         print ("Initiating Election")
         print ("I am %s and my neighbour is %s" % (self.vessel_id, (self.vessel_id % len(self.vessels)) +1))
-        self.contact_vessel(self.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(self.finger_table))
+        self.contact_vessel_for_election(self.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(self.finger_table))
 #------------------------------------------------------------------------------------------------------
 # Contact a specific vessel with a set of variables to transmit to it
     def contact_vessel(self, vessel_ip, path, action_type, key, value):
@@ -96,6 +96,37 @@ class BlackboardServer(HTTPServer):
         success = False
         # The variables must be encoded in the URL format, through urllib.urlencode
         post_content = urlencode({'id': key, 'entry': value})
+        # the HTTP header must contain the type of data we are transmitting, here URL encoded
+        headers = {"Content-type": "application/x-www-form-urlencoded"}
+        # We should try to catch errors when contacting the vessel
+        try:
+            # We contact vessel:PORT_NUMBER since we all use the same port
+            # We can set a timeout, after which the connection fails if nothing happened
+            connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
+            # We only use POST to send data (PUT and DELETE not supported)
+            #action_type = "POST"
+            # We send the HTTP request
+            connection.request(action_type, path, post_content, headers)
+            # We retrieve the response
+            response = connection.getresponse()
+            # We want to check the status, the body should be empty
+            status = response.status
+            # If we receive a HTTP 200 - OK
+            if status == 200:
+                success = True
+        # We catch every possible exceptions
+        except Exception as e:
+            print "Error while contacting %s" % vessel_ip
+            # printing the error given by Python
+            print(e)
+
+        # we return if we succeeded or not
+        return success
+    def contact_vessel_for_election(self, vessel_ip, path, action_type, key, value):
+        # the Boolean variable we will return
+        success = False
+        # The variables must be encoded in the URL format, through urllib.urlencode
+        post_content = urlencode({id:value})
         # the HTTP header must contain the type of data we are transmitting, here URL encoded
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         # We should try to catch errors when contacting the vessel
@@ -263,8 +294,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         elif request_path == ("/ELECTION"):
             print "/ELECTION endpoint hit"
-            their_finger_table = json.loads(parameters["entry"][0])
-            thread = Thread(target=self.election,args=(their_finger_table))
+            thread = Thread(target=self.election,args=(parameters["election_table"][0]))
             # We kill the process if we kill the server
             thread.daemon = True
             # We start the thread
@@ -282,9 +312,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             # We start the thread
             thread.start()
 
-    def election(self, their_finger_table):
+    def election(self, their_finger_table_string):
             print "handling election"
-            print str(their_finger_table)
+            print str(their_finger_table_string)
+            their_finger_table = json.loads(their_finger_table_string)
             if server.identifier in their_finger_table.keys():
                 print ("Election over")
                 server.finger_table = their_finger_table
@@ -296,7 +327,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             else:   
                 print ("Sending Vote")                                                                  
                 their_finger_table[server.identifier] = server.get_ip_address()
-                server.contact_vessel(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
+                server.contact_vessel_for_election(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
             self.success_out()
             
 #------------------------------------------------------------------------------------------------------
