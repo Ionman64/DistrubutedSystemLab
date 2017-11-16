@@ -264,7 +264,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path == ("/ELECTION"):
             print "/ELECTION endpoint hit"
             their_finger_table = json.loads(parameters["entry"][0])
-            if server.identifier in their_finger_table:
+            if server.identifier in their_finger_table.keys():
                 server.finger_table = their_finger_table
                 leader = their_finger_table[sorted(their_finger_table)[0]]
                 print ("The leader is %s" % leader)  
