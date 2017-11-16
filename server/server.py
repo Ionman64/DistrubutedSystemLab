@@ -76,7 +76,6 @@ class BlackboardServer(HTTPServer):
     def election(self):
         time.sleep(1)
         print ("Initiating Election")
-        for vessel in self.vessels:
             if vessel != ("10.1.0.%s" % self.vessel_id):
                 self.contact_vessel(vessel, "/ELECTION", "POST", "votes", json.dumps({"id":self.vessel_id}))
 #------------------------------------------------------------------------------------------------------
@@ -254,6 +253,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path == ("/ELECTION"):
             print "/ELECTION endpoint hit"
             print "params: %s" % parameters
+
+            # if full circle
+
+            # else: pass it on
+                contact_vessel()
+
             self.success_out()
 
     def success_out(self):
