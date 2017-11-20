@@ -46,7 +46,7 @@ class BlackboardServer(HTTPServer):
         self.leaderRandomNumber = None
         # The list of other vessels
         self.vessels = vessel_list
-        self.identifier = str(uuid.uuid4())
+        self.identifier = node_id
         self.finger_table = {self.identifier:self.get_ip_address()}
         if len(vessel_list) > 1:
             self.initiateElection()
