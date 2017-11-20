@@ -239,7 +239,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if (server.leader == None):
                 self.wfile.write(json.dumps({"success":False, "reason":"No leader yet"}))
             else:
-                self.wfile.write(json.dumps({"success":True, "leader":server.leader, "randomNumber":server.leaderRandomNumber}))
+                self.wfile.write(json.dumps({"success":True, "leader":server.leader, "randomNumber":str(server.finger_table)}))
 
         # Default?
         else:
