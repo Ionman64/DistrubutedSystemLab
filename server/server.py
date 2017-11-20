@@ -42,6 +42,7 @@ class BlackboardServer(HTTPServer):
         self.current_key = -1
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
+        self.leader = None
         # The list of other vessels
         self.vessels = vessel_list
         self.identifier = str(uuid.uuid4())
@@ -230,6 +231,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         elif self.path == "/entries":
             self.do_GET_Entries()
+
+        elif self.path.startswith("/leader"):
+            if (server.leader == None):
+                self.wfile.write(json.dumps({"success":False, "reason":"No leader yet"}))
+            else:
+                self.wfile.write(json.dumps({"success":False, "leader":server.leader}))
 
         # Default?
         else:

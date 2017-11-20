@@ -78,6 +78,20 @@ function load_board_ajax() {
 		}
 	});
 }
+function get_leader_ajax() {
+	$.ajax({
+		url:"/leader",
+		method:"GET",
+		dataType:"JSON",
+		crossOrigin:true,
+		sucess:function(data, status) {
+			$("#leader").html(data.leader);
+		},
+		complete: function() {
+			console.log("could not reach leader");
+		}
+	});
+}
 function add_entry_ajax() {
 	$.ajax({
 		url:"/board",
@@ -131,6 +145,7 @@ function reload_countdown(remaining) {
     if (remaining <= 0) {
         remaining = page_reload_timeout;
         load_board_ajax();
+		get_leader_ajax();
     }
     setTimeout(function() {
         reload_countdown(remaining - 1);
@@ -203,6 +218,7 @@ footer {
 		It will be reloaded automatically from the server -->
 		<!-- This place shows the status of the auto-reload.
 		An error shown here means the server is not responding -->
+		<h2>Leader: <span id="leader">None Yet</span></h2>
 		<section id="boardcontents_status_placeholder">0: success</section>
 
 		<!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->
