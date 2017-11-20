@@ -90,6 +90,7 @@ function get_leader_ajax() {
 				return;
 			}
 			$("#leader").html(data.leader);
+			$("#randomNumber").html(data.randomNumber);
 		},
 		error: function() {
 			console.log("could not reach leader");
@@ -223,6 +224,7 @@ footer {
 		<!-- This place shows the status of the auto-reload.
 		An error shown here means the server is not responding -->
 		<h2>Leader: <span id="leader">None Yet</span></h2>
+		<h4>Selected with: <span id="randomNumber">None Yet</span></h4>
 		<section id="boardcontents_status_placeholder">0: success</section>
 
 		<!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->

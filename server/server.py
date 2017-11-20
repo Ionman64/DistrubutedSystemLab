@@ -43,6 +43,7 @@ class BlackboardServer(HTTPServer):
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
         self.leader = None
+        self.leaderRandomNumber = None
         # The list of other vessels
         self.vessels = vessel_list
         self.identifier = str(uuid.uuid4())
@@ -237,7 +238,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if (server.leader == None):
                 self.wfile.write(json.dumps({"success":False, "reason":"No leader yet"}))
             else:
-                self.wfile.write(json.dumps({"success":True, "leader":server.leader}))
+                self.wfile.write(json.dumps({"success":True, "leader":server.leader, "randomNumber":server.leaderRandomNumber}))
 
         # Default?
         else:
@@ -341,6 +342,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if server.identifier in their_finger_table.keys():
                 print ("Election over")
                 server.finger_table = their_finger_table
+                server.leaderRandomNumber = sorted(their_finger_table)[0]
                 server.leader = their_finger_table[sorted(their_finger_table)[0]]
                 print ("The leader is %s" % server.leader)
                 #when our own id is in the fingertable we can assume that the election has
