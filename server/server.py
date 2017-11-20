@@ -17,6 +17,7 @@ from threading import  Thread # Thread Management
 import uuid
 import json
 import time
+import random
 #------------------------------------------------------------------------------------------------------
 
 # Global variables for HTML templates
@@ -46,7 +47,7 @@ class BlackboardServer(HTTPServer):
         self.leaderRandomNumber = None
         # The list of other vessels
         self.vessels = vessel_list
-        self.identifier = node_id
+        self.identifier = str(random.random()*99999)
         self.finger_table = {self.identifier:self.get_ip_address()}
         if len(vessel_list) > 1:
             self.initiateElection()
