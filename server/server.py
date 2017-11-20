@@ -341,8 +341,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if server.identifier in their_finger_table.keys():
                 print ("Election over")
                 server.finger_table = their_finger_table
-                leader = their_finger_table[sorted(their_finger_table)[0]]
-                print ("The leader is %s" % leader)
+                server.leader = their_finger_table[sorted(their_finger_table)[0]]
+                print ("The leader is %s" % server.leader)
                 #when our own id is in the fingertable we can assume that the election has
                 # reached all nodes (e.g. gone full circle, one round)
                 # We then select the leader with the lowest key
