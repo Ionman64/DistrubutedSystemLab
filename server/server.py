@@ -232,7 +232,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif self.path == "/entries":
             self.do_GET_Entries()
 
-        elif self.path.startswith("/leader"):
+        elif self.path.== "/leader":
             if (server.leader == None):
                 self.wfile.write(json.dumps({"success":False, "reason":"No leader yet"}))
             else:
