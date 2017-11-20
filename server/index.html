@@ -84,10 +84,14 @@ function get_leader_ajax() {
 		method:"GET",
 		dataType:"JSON",
 		crossOrigin:true,
-		sucess:function(data, status) {
+		success:function(data, status) {
+			if (!data.success) {
+				console.log("error finding leader");
+				return;
+			}
 			$("#leader").html(data.leader);
 		},
-		complete: function() {
+		error: function() {
 			console.log("could not reach leader");
 		}
 	});
