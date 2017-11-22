@@ -260,7 +260,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True) 
+        self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True)
         self.wfile.write(json.dumps(self.server.Entries))
 
 
@@ -311,13 +311,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #I am the leader
                 entry_response['id'] = id
                 entry_response['timestamp'] = time.time()
-                entry_response['text'] = entry 
+                entry_response['text'] = entry
                 self.server.Entries[id] = entry_response
                 self.retransmit(request_path, "POST", id, json.dumps(entry_response))
                 #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
                 #I am not the leader
-                # pass along post to leader 
+                # pass along post to leader
                 self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
             self.success_out()
 
