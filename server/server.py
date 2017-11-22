@@ -260,6 +260,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
+        self.server.Entries = sorted(self.server.Entries, key=return_entry_timestamp, reverse=True) 
         self.wfile.write(json.dumps(self.server.Entries))
 
 
@@ -294,24 +295,33 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
 
         if request_path == "/board":
-            #here we will apply a timestamp to the entry only if we are the leader. After the request has been dealth with we will return our timestamp to the calling node so that he can update his board order. we also need to add a new entry point that allows nodes to obtain the full board with the order and timestamps.
-            if 'id' in parameters:
-                id = parameters['id'][0] # post passed on from non-leader
-            else:
+            keys = parameters.keys()
+            id = None
+            entry = None
+            if 'entry' not in keys:
+                self.wfile.write(json.dumps("success":False, "reason":"No entry parameter"))
+                return
+            entry = parameters['entry'][0]
+            if 'id' not in keys:
                 id = str(uuid.uuid4())
-
-            entry_value = dict.fromkeys(['text', 'timestamp'])
-            entry_value['text'] = parameters['entry'][0]
-            
+            else:
+                id = parameters['id'][0]
+            #here we will apply a timestamp to the entry only if we are the leader. After the request has been dealth with we will return our timestamp to the calling node so that he can update his board order. we also need to add a new entry point that allows nodes to obtain the full board with the order and timestamps.
+            entry_response = {}
             if self.server.vessel_id == self.server.leader:
-                entry_value['timestamp'] = time.time()
-                self.server.Entries[id] = entry_value
-                self.retransmit(request_path, "POST", id, entry_value)
-                self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
+                #I am the leader
+                entry_response['id'] = id
+                entry_response['timestamp'] = time.time()
+                entry_response['text'] = entry 
+                self.server.Entries[id] = entry_response
+                self.retransmit(request_path, "POST", id, json.dumps(entry_response))
+                success_out():
+                #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
-                # pass along post to leader
-                self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry_value)
-                self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value}))
+                #I am not the leader
+                # pass along post to leader 
+                self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
+                success_out()
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
@@ -420,6 +430,12 @@ def read_file(filename):
     return all_content
 #------------------------------------------------------------------------------------------------------
 
+def return_entry_timestamp(entry):
+    if 'timestamp' not in entry:
+        print ("Timestamp missing in;")
+        print entry
+        return 0
+    return entry['timestamp']
 
 # Execute the code
 if __name__ == '__main__':
