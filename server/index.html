@@ -41,6 +41,7 @@ function load_board_ajax() {
 			</div>*/
 			$("#board-contents").empty();
 			$.each(data, function(key, value) {
+				var item = JSON.parse(value);
 				var board_entry = el("section");
 				board_entry.id = "boardcontents_placeholder";
 				var boardtitle = el("section");
@@ -48,27 +49,33 @@ function load_board_ajax() {
 				boardtitle.className = "boardtitle";
 				board_entry.appendChild(boardtitle);
 				var input = el("input");
-				input.type = "text";
-				input.name = "id";
+				input.type = "number";
+				input.name = "order";
 				input.value = key;
 				input.readonly = true;
 				board_entry.appendChild(input);
 				var input = el("input");
 				input.type = "text";
+				input.name = "id";
+				input.value = item.id;
+				input.readonly = true;
+				board_entry.appendChild(input);
+				var input = el("input");
+				input.type = "text";
 				input.name = "entry";
-				input.value = value;
-				input.setAttribute("data-id", key);
+				input.value = item.text;
+				input.setAttribute("data-id", item.id);
 				input.style.size = "70%";
 				board_entry.appendChild(input);
 				var button = el("button");
 				button.innerHTML = "modify";
 				button.className = "modify";
-				button.setAttribute("data-id", key);
+				button.setAttribute("data-id", item.id);
 				board_entry.appendChild(button);
 				var button = el("button");
 				button.innerHTML = "delete";
 				button.className = "delete";
-				button.setAttribute("data-id", key);
+				button.setAttribute("data-id", item.id);
 				board_entry.appendChild(button);
 				$("#board-contents").append(board_entry);
 			});

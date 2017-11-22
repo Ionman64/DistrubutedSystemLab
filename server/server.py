@@ -263,7 +263,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         temp_entries = []
         for item in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
             print "IT:%s:" % item
-            temp_entries.append(item['text'])
+            temp_entries.append(item)
         self.wfile.write(json.dumps(temp_entries))
 
 
