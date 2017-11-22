@@ -261,8 +261,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
         temp_entries = {}
-        for keys in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
-            temp_entries[keys] = self.server.Entries[keys]
+        for item in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
+            temp_entries[item.id] = item
         self.wfile.write(json.dumps(temp_entries))
 
 
