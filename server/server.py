@@ -315,13 +315,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 entry_response['text'] = entry 
                 self.server.Entries[id] = entry_response
                 self.retransmit(request_path, "POST", id, json.dumps(entry_response))
-                success_out():
+                self.success_out():
                 #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
                 #I am not the leader
                 # pass along post to leader 
                 self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
-                success_out()
+                self.success_out()
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
@@ -348,7 +348,9 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             thread.start()
 
     def success_out(self):
+            self.set_HTTP_headers(200)
             self.wfile.write(json.dumps({"status": "OK"}))
+            self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
             action = ''.join(["/propagate", action])
@@ -397,7 +399,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = self.path.replace("/entries/", "")
             if id in self.server.Entries:
                 # Delete
-                self.set_HTTP_headers(200)
                 self.server.delete_value_in_store(id)
                 self.success_out()
                 self.retransmit(request_path, "DELETE", id)
@@ -410,7 +411,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = self.path.replace("/propagate/entries/", "")
             if id in self.server.Entries:
                 # Delete
-                self.set_HTTP_headers(200)
                 self.server.delete_value_in_store(id)
                 self.success_out()
             else:
