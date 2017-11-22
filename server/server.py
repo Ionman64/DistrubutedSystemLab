@@ -293,13 +293,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         parameters = self.parse_POST_request()
         print "parameters: %s" % parameters
         self.set_HTTP_headers(200)
-
         if request_path == "/board":
             keys = parameters.keys()
             id = None
             entry = None
             if 'entry' not in keys:
-                self.wfile.write(json.dumps("success":False, "reason":"No entry parameter"))
+                self.error_out("No entry parameter")
                 return
             entry = parameters['entry'][0]
             if 'id' not in keys:
@@ -315,13 +314,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 entry_response['text'] = entry 
                 self.server.Entries[id] = entry_response
                 self.retransmit(request_path, "POST", id, json.dumps(entry_response))
-                self.success_out():
                 #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
                 #I am not the leader
                 # pass along post to leader 
                 self.server.contact_vessel(self.server.leader, "/board", "POST", "entry", entry)
-                self.success_out()
+            self.success_out()
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
@@ -350,7 +348,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
     def success_out(self):
             self.set_HTTP_headers(200)
             self.wfile.write(json.dumps({"status": "OK"}))
-            self.wfile.close()
+            #self.wfile.close()
+    
+     def error_out(self, reason=None, header=200):
+            self.set_HTTP_headers(header)
+            self.wfile.write(json.dumps({"status": "FAIL", "reason":reason}))
+            #self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
             action = ''.join(["/propagate", action])
@@ -404,8 +407,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.retransmit(request_path, "DELETE", id)
             else:
                 #return not found
-                self.set_HTTP_headers(404)
-                self.wfile.write(json.dumps({"status": "Not Found"}))
+                self.error_out("Not found", 404)
 
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
@@ -415,8 +417,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.success_out()
             else:
                 #return not found
-                self.set_HTTP_headers(404)
-                self.wfile.write(json.dumps({"status": "Not Found"}))
+                self.error_out("Not found", 404)
 
 #---------------------------------------------------------------------------------
 # file i/o
