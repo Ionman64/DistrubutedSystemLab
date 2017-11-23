@@ -149,7 +149,7 @@ class BlackboardServer(HTTPServer):
                 # Here, we do it only once
                 print "---> propagating to %s" % vessel
                 self.contact_vessel(vessel, path, action_type, key, value)
-                
+
 #------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
 # This class implements the logic when a server receives a GET or POST request
@@ -225,7 +225,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
         temp_entries = []
         for item in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
-            print "IT:%s:" % item
             temp_entries.append(item)
         self.wfile.write(json.dumps(temp_entries))
 
