@@ -18,13 +18,6 @@ import uuid
 import json
 import time
 import random
-#------------------------------------------------------------------------------------------------------
-
-# Global variables for HTML templates
-board_frontpage_footer_template = ""
-board_frontpage_header_template = ""
-boardcontents_template = ""
-entry_template = ""
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
@@ -39,12 +32,9 @@ class BlackboardServer(HTTPServer):
         HTTPServer.__init__(self,server_address, handler)
         # we create the dictionary of values
         self.Entries = {}
-        # We keep a variable of the next id to insert
-        self.current_key = -1
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
         self.leader = None
-        self.leaderRandomNumber = None
         # The list of other vessels
         self.vessels = vessel_list
         self.identifier = str(random.random()*99999)
@@ -56,31 +46,11 @@ class BlackboardServer(HTTPServer):
     def shutdown(self):
         self.socket.close()
         HTTPServer.shutdown(self)
-
-    # We add a value received to the store
-    def add_value_to_store(self, key, value):
-        # We add the value to the store
-        self.Entries[key] = value
-#------------------------------------------------------------------------------------------------------
-    # We modify a value received in the store
-    def modify_value_in_store(self,key,value):
-        # we modify a value in the store if it exists
-        self.Entries[key] = value
 #------------------------------------------------------------------------------------------------------
     # We delete a value received from the store
     def delete_value_in_store(self,key):
         # we delete a value in the store if it exists
         del self.Entries[key]
-
-    def get_all_entries(self):
-        return self.Entries
-
-    def get_entry_from_store(self, key):
-        return self.Entries[key]
-
-    def clear_store(self):
-        self.Entries.clear()
-
 
     def initiateElection(self):
         thread = Thread(target=self.election)
@@ -179,14 +149,7 @@ class BlackboardServer(HTTPServer):
                 # Here, we do it only once
                 print "---> propagating to %s" % vessel
                 self.contact_vessel(vessel, path, action_type, key, value)
-#------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
+                
 #------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
 # This class implements the logic when a server receives a GET or POST request
@@ -266,19 +229,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             temp_entries.append(item)
         self.wfile.write(json.dumps(temp_entries))
 
-
     def do_GET_Index(self):
-        # We set the response status code to 200 (OK)
+        #output index.html
         self.set_HTTP_headers(200)
-        # We should do some real HTML here
-        #In practice, go over the entries list,
-        #produce the boardcontents part,
-        #then construct the full page by combining all the parts ...
-
-        header = board_frontpage_header_template
-        body = boardcontents_template % ("My Board", "good day")
-        footer = board_frontpage_footer_template % ("The dude and the other dude")     #(groupMembers)
-        self.wfile.write(header + body + footer)
+        self.wfile.write(index)
 
 
 #------------------------------------------------------------------------------------------------------
@@ -288,7 +242,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 # Request handling - POST
 #------------------------------------------------------------------------------------------------------
     def do_POST(self):
-        print("Receiving a POST on %s" % self.path)
         # Here, we should check which path was requested and call the right logic based on it
         # We should also parse the data received
         # and set the headers for the client
@@ -310,7 +263,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 id = parameters['id'][0]
             entry_response = {}
             self.success_out()
-            if ("10.1.0.%d" % self.server.vessel_id) == self.server.leader:
+            if self.server.get_ip_address() == self.server.leader:
                 entry_response = {}
                 #I am the leader
                 if id in self.server.Entries:
@@ -365,8 +318,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             thread.start()
 
     def election(self, their_finger_table_string):
-            print "handling election"
-            print str(their_finger_table_string)
             their_finger_table = json.loads(their_finger_table_string)
             if server.identifier in their_finger_table.keys():
                 print ("Election over")
@@ -377,7 +328,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #when our own id is in the fingertable we can assume that the election has
                 # reached all nodes (e.g. gone full circle, one round)
                 # We then select the leader with the lowest key
-
             else:
                 print ("Sending Vote")
                 their_finger_table[server.identifier] = server.get_ip_address()
@@ -405,14 +355,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = parameters['id'][0]
             if id in self.server.Entries:
                 self.success_out()
-                if ("10.1.0.%d" % self.server.vessel_id) == self.server.leader:
+                if self.server.get_ip_address() == self.server.leader:
                     #we are leader
                     self.server.delete_value_in_store(id)
                     self.retransmit(request_path, "DELETE", id, None)
                 else:
                     #we are NOT leader
                     self.server.contact_vessel(self.server.leader, "/board", "DELETE", id, None)
-
             else:
                 #return not found
                 self.error_out("Not found", 404)
@@ -443,23 +392,13 @@ def read_file(filename):
 #------------------------------------------------------------------------------------------------------
 
 def return_entry_timestamp(entry):
-    print "E: %s" % entry
     if 'timestamp' not in entry:
-        print ("Timestamp missing in;")
-        print entry
         return 0
     return entry['timestamp']
 
 # Execute the code
 if __name__ == '__main__':
-
-    ## read the templates from the corresponding html files
-    board_frontpage_header_template = index = read_file("index.html");
-    #board_frontpage_header_template = read_file('board_frontpage_header_template.html')
-    board_frontpage_footer_template = read_file('board_frontpage_footer_template.html')
-    boardcontents_template = read_file('boardcontents_template.html')
-    entry_template = read_file('entry_template.html')
-
+    index = read_file("index.html");
     vessel_list = []
     vessel_id = 0
     # Checking the arguments
