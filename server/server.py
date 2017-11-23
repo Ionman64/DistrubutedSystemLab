@@ -407,7 +407,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 # Delete
                 self.server.delete_value_in_store(id)
                 self.success_out()
-                #self.retransmit(request_path, "DELETE", id)
+                self.server.contact_vessel(self.server.leader, "/board", "DELETE", id, None)
             else:
                 #return not found
                 self.error_out("Not found", 404)
