@@ -308,35 +308,28 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 id = str(uuid.uuid4())
             else:
                 id = parameters['id'][0]
-            #here we will apply a timestamp to the entry only if we are the leader. After the request has been dealth with we will return our timestamp to the calling node so that he can update his board order. we also need to add a new entry point that allows nodes to obtain the full board with the order and timestamps.
             entry_response = {}
             self.success_out()
-            print "--leader leader: %s , vessel:%s" % (self.server.leader, self.server.vessel_id)
             if ("10.1.0.%d" % self.server.vessel_id) == self.server.leader:
-
+                entry_response = {}
                 #I am the leader
-                entry_response['id'] = id
-                entry_response['timestamp'] = time.time()
-                entry_response['text'] = entry
-                self.server.Entries[id] = entry_response
+                if id in self.server.Entries:
+                    #post is old, just update the text
+                    self.server.Entries[id]["text"] = entry
+                    entry_response = self.server.Entries[id]
+                else:
+                    #post is new, apply a timestamp to order the entry.
+                    entry_response = {'id':id, 'timestamp':time.time(), 'text':entry}
+                    self.server.Entries[id] = entry_response
                 self.retransmit(request_path, "POST", id, json.dumps(entry_response))
-                #self.wfile.write(json.dumps({"status": "OK", "id": id, "entry": entry_value['text'], "timestamp": entry_value['timestamp']}))
             else :
-                print "--not leader"
                 #I am not the leader
                 # pass along post to leader
                 self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry)
 
-
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
             self.server.Entries[id] = json.loads(parameters['entry'][0])
-            self.success_out()
-
-        elif request_path.startswith("/entries/"):
-            id = self.path.replace("/entries/", "")
-            self.server.Entries[id]['text'] = parameters['entry'][0]
-            self.retransmit(request_path, "POST", id, parameters['entry'][0])
             self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
@@ -405,13 +398,16 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
         request_path = self.path
 
-        if request_path.startswith("/entries/"):
-            id = self.path.replace("/entries/", "")
+        if request_path.startswith("/board"):
+            if 'id' not in keys:
+                self.error_out("missing id")
+                return
+            id = parameters['id'][0]
             if id in self.server.Entries:
                 # Delete
                 self.server.delete_value_in_store(id)
                 self.success_out()
-                self.retransmit(request_path, "DELETE", id)
+                #self.retransmit(request_path, "DELETE", id)
             else:
                 #return not found
                 self.error_out("Not found", 404)

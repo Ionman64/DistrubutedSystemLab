@@ -123,11 +123,11 @@ function add_entry_ajax() {
 }
 function modify_ajax(id) {
 	$.ajax({
-		url:"/entries/" + id,
+		url:"/board",
 		method:"POST",
 		dataType:"JSON",
 		crossOrigin:true,
-		data: {"entry":$("input[data-id='" + id + "']").val()},
+		data: {"id":id,"entry":$("input[data-id='" + id + "']").val()},
 		sucess:function(data, status) {
 			page_reload_count++;
 			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
@@ -139,9 +139,10 @@ function modify_ajax(id) {
 }
 function delete_ajax(id) {
 	$.ajax({
-		url:"/entries/" + id,
+		url:"/board",
 		method:"DELETE",
 		dataType:"JSON",
+		data:{"id":id},
 		crossOrigin:true,
 		sucess:function(data, status) {
 			page_reload_count++;
