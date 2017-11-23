@@ -366,16 +366,21 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.error_out("Not found", 404)
 
         elif request_path.startswith("/propagate/board/"):
+            print ("Propagate!")
             if 'id' not in keys:
                 self.error_out("missing id")
+                print ("Propagate!:NOKEY")
                 return
             id = parameters['id'][0]
+            print ("Propagate!: ID %s" % id)
             if id in self.server.Entries:
                 # Delete
+                print ("Propagate!: ID FOUND %s")
                 self.server.delete_value_in_store(id)
                 self.success_out()
             else:
                 #return not found
+                print ("Propagate!: ID NOT FOUND")
                 self.error_out("Not found", 404)
 
 #---------------------------------------------------------------------------------
