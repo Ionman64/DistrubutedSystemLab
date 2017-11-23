@@ -35,6 +35,7 @@ class BlackboardServer(HTTPServer):
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
         self.leader = None
+        self.failedLeaders = 0
         # The list of other vessels
         self.vessels = vessel_list
         self.identifier = str(random.random()*99999)
@@ -99,6 +100,9 @@ class BlackboardServer(HTTPServer):
                 success = True
         # We catch every possible exceptions
         except TimeoutError as e:
+            self.failedLeaders = self.failedLeaders + 1
+            self.leader = self.finger_table[sorted(self.finger_table)[self.leaderNum]]
+            self.contact_vessel(self, vessel_ip, path, action_type, key, value)
             #Here we should retransmit to the next vessel in the finger table
         except Exception as e:
             print "Error while contacting %s" % vessel_ip
@@ -321,6 +325,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if server.identifier in their_finger_table.keys():
                 print ("Election over")
                 server.finger_table = their_finger_table
+                self.server.failedLeaders = 0
                 server.leaderRandomNumber = sorted(their_finger_table)[0]
                 server.leader = their_finger_table[sorted(their_finger_table)[0]]
                 print ("The leader is %s" % server.leader)
