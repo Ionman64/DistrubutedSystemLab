@@ -365,7 +365,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #return not found
                 self.error_out("Not found", 404)
 
-        elif request_path.startswith("/propagate/board/"):
+        elif request_path.startswith("/propagate/board"):
             print ("Propagate!")
             if 'id' not in keys:
                 self.error_out("missing id")
