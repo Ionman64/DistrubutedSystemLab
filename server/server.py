@@ -88,8 +88,6 @@ class BlackboardServer(HTTPServer):
             # We contact vessel:PORT_NUMBER since we all use the same port
             # We can set a timeout, after which the connection fails if nothing happened
             connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
-            # We only use POST to send data (PUT and DELETE not supported)
-            #action_type = "POST"
             # We send the HTTP request
             connection.request(action_type, path, post_content, headers)
             # We retrieve the response
@@ -100,6 +98,8 @@ class BlackboardServer(HTTPServer):
             if status == 200:
                 success = True
         # We catch every possible exceptions
+        except TimeoutError as e:
+            #Here we should retransmit to the next vessel in the finger table
         except Exception as e:
             print "Error while contacting %s" % vessel_ip
             # printing the error given by Python
