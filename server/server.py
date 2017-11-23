@@ -404,10 +404,15 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 return
             id = parameters['id'][0]
             if id in self.server.Entries:
-                # Delete
-                self.server.delete_value_in_store(id)
                 self.success_out()
-                self.server.contact_vessel(self.server.leader, "/board", "DELETE", id, None)
+                if ("10.1.0.%d" % self.server.vessel_id) == self.server.leader:
+                    #we are leader
+                    self.server.delete_value_in_store(id)
+                    self.retransmit(request_path, "DELETE", id, None)
+                else:
+                    #we are NOT leader
+                    self.server.contact_vessel(self.server.leader, "/board", "DELETE", id, None)
+
             else:
                 #return not found
                 self.error_out("Not found", 404)
