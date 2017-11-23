@@ -356,6 +356,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
+            action = ''.join(["/propagate", action])
             print "retransmitting to vessels on" + action
             thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, action_type, key, value))
             # We kill the process if we kill the server
@@ -416,8 +417,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #return not found
                 self.error_out("Not found", 404)
 
-        elif request_path.startswith("/propagate/entries/"):
-            id = self.path.replace("/propagate/entries/", "")
+        elif request_path.startswith("/propagate/board/"):
+            if 'id' not in keys:
+                self.error_out("missing id")
+                return
+            id = parameters['id'][0]
             if id in self.server.Entries:
                 # Delete
                 self.server.delete_value_in_store(id)
