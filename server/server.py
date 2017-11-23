@@ -356,7 +356,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
-            action = ''.join(["/propagate", action])
             print "retransmitting to vessels on" + action
             thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, action_type, key, value))
             # We kill the process if we kill the server
