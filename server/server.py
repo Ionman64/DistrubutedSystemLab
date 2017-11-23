@@ -395,7 +395,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 #------------------------------------------------------------------------------------------------------
     def do_DELETE(self):
         print("Receiving a DELETE on %s" % self.path)
-
+        parameters = self.parse_POST_request()
         request_path = self.path
         keys = parameters.keys()
         if request_path.startswith("/board"):
