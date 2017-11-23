@@ -397,7 +397,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         print("Receiving a DELETE on %s" % self.path)
 
         request_path = self.path
-
+        keys = parameters.keys()
         if request_path.startswith("/board"):
             if 'id' not in keys:
                 self.error_out("missing id")
