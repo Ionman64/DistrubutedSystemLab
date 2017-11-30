@@ -36,9 +36,25 @@ class BlackboardServer(HTTPServer):
         self.vessel_id = node_id
         # The list of other vessels
         self.vessels = vessel_list
-        self.identifier = str(random.random()*99999)
-        self.finger_table = {self.identifier:self.get_ip_address()}
+        # Create vector clock and initalize all to 0
+        self.vclock = dict.fromkeys(self.vessels, 0)
 
+        self.print_vclock()
+        print self.tick()
+        self.print_vclock()
+
+
+    def tick(self):
+        this_vessel = self.get_ip_address()
+        self.vclock[this_vessel] = self.vclock[this_vessel] + 1
+        return self.vclock[this_vessel]
+
+    def update_clock(self, other_clock):
+            pass
+
+    def print_vclock(self):
+        for k, v in self.vclock.items():
+            print (k, '-->', v)
 
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
