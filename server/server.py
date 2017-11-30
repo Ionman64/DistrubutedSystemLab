@@ -191,24 +191,18 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             else:
                 # get from parameters (modified entry)
                 id = parameters['id'][0]
-            entry_response = {}
             self.success_out()
-            if self.server.get_ip_address() == self.server.leader:
-                entry_response = {}
-                #I am the leader
-                if id in self.server.Entries:
-                    #post is old, just update the text
-                    self.server.Entries[id]["text"] = entry
-                    entry_response = self.server.Entries[id]
-                else:
-                    #post is new, apply a timestamp to order the entry.
-                    entry_response = {'id':id, 'timestamp':time.time(), 'text':entry}
-                    self.server.Entries[id] = entry_response
-                self.retransmit(request_path, "POST", id, json.dumps(entry_response))
-            else :
-                #I am not the leader
-                # pass along post to leader
-                self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry)
+
+            entry_response = {}
+            if id in self.server.Entries:
+                #post is old, just update the text
+                self.server.Entries[id]["text"] = entry
+                entry_response = self.server.Entries[id]
+            else:
+                #post is new, apply a timestamp to order the entry.
+                entry_response = {'id':id, 'timestamp':time.time(), 'text':entry}
+                self.server.Entries[id] = entry_response
+            self.retransmit(request_path, "POST", id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
@@ -256,13 +250,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             id = parameters['id'][0]
             if id in self.server.Entries:
                 self.success_out()
-                if self.server.get_ip_address() == self.server.leader:
-                    #we are leader
-                    self.server.delete_value_in_store(id)
-                    self.retransmit(request_path, "DELETE", id, None)
-                else:
-                    #we are NOT leader
-                    self.server.contact_vessel(self.server.leader, "/board", "DELETE", id, None)
+                self.server.delete_value_in_store(id)
+                self.retransmit(request_path, "DELETE", id, None)
             else:
                 #return not found
                 self.error_out("Not found", 404)
