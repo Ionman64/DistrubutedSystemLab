@@ -222,15 +222,20 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path == "/propagate/board":
             content = json.loads(parameters['entry'][0])
             print "content>> %s" % json.dumps(content)
-            pid = content['pid']
+            sender = content['pid']
             incoming_vclock = content['vc']
-            if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
+            for pid in incoming_vclock.keys():
+                if pid != self.server.get_ip_address():
+                    if self.server.vclock[pid] < incoming_vclock[pid]:
+                        self.server.vclock[pid] = incoming_vclock[pid]
+                        print ("Updated my clock for %s to %s" % pid, incoming_vclock[pid])
+            #if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
                 # not in order, put in buffer
-                print "putting in buffer"
-            else:
-                id = parameters['id'][0]
-                self.server.Entries[id] = json.loads(parameters['entry'][0])
-                self.success_out()
+            #    print "putting in buffer"
+            #else:
+            id = parameters['id'][0]
+            self.server.Entries[id] = json.loads(parameters['entry'][0])
+            self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
