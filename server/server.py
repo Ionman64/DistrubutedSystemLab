@@ -23,6 +23,11 @@ import random
 # Static variables definitions
 IP_ADDRESS_PREFIX = "10.1.0."
 PORT_NUMBER = 61001
+
+# debug variables
+DEBUG = False
+LOCALHOST = "127.0.0.1"
+PORT_PREFIX = "6100"
 #------------------------------------------------------------------------------------------------------
 
 class BlackboardServer(HTTPServer):
@@ -67,6 +72,9 @@ class BlackboardServer(HTTPServer):
 
 
     def get_ip_address(self):
+        if DEBUG:
+            # use port instead of ip when running all vessels locally
+            return PORT_PREFIX + str(self.vessel_id)
         return IP_ADDRESS_PREFIX + str(self.vessel_id)
 
 
@@ -82,7 +90,11 @@ class BlackboardServer(HTTPServer):
         try:
             # We contact vessel:PORT_NUMBER since we all use the same port
             # We can set a timeout, after which the connection fails if nothing happened
-            connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
+            if DEBUG:
+                # vessel_ip is portnr here
+                connection = HTTPConnection("%s:%s" % (LOCALHOST, vessel_ip), timeout = 30)
+            else:
+                connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
             # We send the HTTP request
             connection.request(action_type, path, post_content, headers)
             # We retrieve the response
@@ -221,7 +233,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path == "/propagate/board":
             content = json.loads(parameters['entry'][0])
             print "content>> %s" % json.dumps(content)
-            sender = content['pid']
+            #sender = content['pid']
             incoming_vclock = content['vc']
             self.server.update_clock(incoming_vclock)
             self.server.print_vclock()
@@ -302,12 +314,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 # file i/o
 def read_file(filename):
     curr_path = sys.path[0]
-    opened_file = open('%s/%s' % (curr_path, filename), 'r')
-    all_content = ''
-    for line in opened_file:
-        all_content += line
-    opened_file.close()
-    return all_content
+    f = open('%s/%s' % (curr_path, filename))
+    content = f.read()
+    f.close()
+    return content
 
 
 def return_entry_timestamp(entry):
@@ -321,8 +331,22 @@ if __name__ == '__main__':
     vessel_list = []
     vessel_id = 0
     # Checking the arguments
-    if len(sys.argv) != 3: # 2 args, the script and the vessel name
-        print("Arguments: vessel_ID number_of_vessels")
+    nr_args = len(sys.argv)
+    if nr_args < 3 or nr_args > 4: # 2 args, the script and the vessel name
+        print("Arguments: vessel_ID number_of_vessels [--debug]" )
+
+    elif len(sys.argv) == 4 and sys.argv[3] == "--debug":
+        # Set port as id instead of ip for running on localhost:
+        DEBUG = True
+        vessel_id = int(sys.argv[1])
+        for i in range(1, int(sys.argv[2])+1):
+            vessel_list.append(PORT_PREFIX + str(i))
+
+        # We launch a server
+        port_nr = int(PORT_PREFIX + str(vessel_id))
+        server = BlackboardServer((LOCALHOST, port_nr), BlackboardRequestHandler, vessel_id, vessel_list)
+        print("Starting DEBUG server on port: %s:%d" % (LOCALHOST, port_nr))
+
     else:
         # We need to know the vessel IP
         vessel_id = int(sys.argv[1])
@@ -330,17 +354,19 @@ if __name__ == '__main__':
         for i in range(1, int(sys.argv[2])+1):
             vessel_list.append(IP_ADDRESS_PREFIX + ("%d" % i)) # We can add ourselves, we have a test in the propagation
 
-    # We launch a server
-    server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
-    print("Starting the server on port: %d" % PORT_NUMBER)
+        # We launch a server
+        server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
+        print("Starting the server on port: %d" % PORT_NUMBER)
+
 
     # Printing all vessels
+    print "This Server: %s" % vessel_id
     print "All vessels:"
     for vessel in vessel_list:
-        if vessel.endswith(str(vessel_id)):
-            print "%s:%s <-- this server" % (vessel, PORT_NUMBER)
+        if DEBUG:
+            print "    %s:%s" % (LOCALHOST, vessel)
         else:
-            print "%s:%s" % (vessel, PORT_NUMBER)
+            print "    %s:%s" % (vessel, PORT_NUMBER)
 
     try:
         server.serve_forever()
