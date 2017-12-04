@@ -39,6 +39,9 @@ class BlackboardServer(HTTPServer):
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
 
+        self.print_vclock()
+        self.update_clock({"10.1.0.1": 3, "10.1.0.2": 4})
+        self.print_vclock()
 
     def tick(self):
         this_vessel = self.get_ip_address()
@@ -47,9 +50,9 @@ class BlackboardServer(HTTPServer):
 
 
     def update_clock(self, other_clock):
-        for k, v in self.vclock.items():
+        for k, v in other_clock.items():
             self.vclock[k] = max(self.vclock[k], v) # choose highest value
-
+        self.tick()
 
     def print_vclock(self):
         for k, v in self.vclock.items():
@@ -223,6 +226,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         elif request_path == "/propagate/board":
             id = parameters['id'][0]
             self.server.Entries[id] = json.loads(parameters['entry'][0])
+
             self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
