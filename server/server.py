@@ -39,22 +39,21 @@ class BlackboardServer(HTTPServer):
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
 
-        self.print_vclock()
-        print self.tick()
-        self.print_vclock()
-
 
     def tick(self):
         this_vessel = self.get_ip_address()
         self.vclock[this_vessel] = self.vclock[this_vessel] + 1
         return self.vclock[this_vessel]
 
+
     def update_clock(self, other_clock):
-            pass
+        for k, v in self.vclock.items():
+            self.vclock[k] = max(self.vclock[k], v) # choose highest value
+
 
     def print_vclock(self):
         for k, v in self.vclock.items():
-            print (k, '-->', v)
+            print (k, v)
 
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
@@ -188,6 +187,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # Here, we should check which path was requested and call the right logic based on it
         # We should also parse the data received
         # and set the headers for the client
+        self.server.print_vclock()
         request_path = self.path
         parameters = self.parse_POST_request()
         print("Receiving a POST on %s" % self.path)
@@ -216,7 +216,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 entry_response = self.server.Entries[id]
             else:
                 #post is new, apply a timestamp to order the entry.
-                entry_response = {'id':id, 'timestamp':time.time(), 'text':entry}
+                entry_response = {'id':id, 'timestamp': self.server.tick(), 'text':entry, 'vc': self.server.vclock}
                 self.server.Entries[id] = entry_response
             self.retransmit(request_path, "POST", id, json.dumps(entry_response))
 
