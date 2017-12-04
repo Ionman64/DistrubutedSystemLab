@@ -220,8 +220,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.retransmit(request_path, "POST", id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
-            content = parameters['entry'][0]
-            print "content>> %s" % content
+            content = json.loads(parameters['entry'][0])
+            print "content>> %s" % json.dumps(content)
             pid = content['pid']
             incoming_vclock = content['vc']
             if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
