@@ -39,10 +39,6 @@ class BlackboardServer(HTTPServer):
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
 
-        self.print_vclock()
-        self.update_clock({"10.1.0.1": 3, "10.1.0.2": 4})
-        self.print_vclock()
-
     def tick(self):
         this_vessel = self.get_ip_address()
         self.vclock[this_vessel] = self.vclock[this_vessel] + 1
@@ -219,15 +215,20 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 entry_response = self.server.Entries[id]
             else:
                 #post is new, apply a timestamp to order the entry.
-                entry_response = {'id':id, 'timestamp': self.server.tick(), 'text':entry, 'vc': self.server.vclock}
+                entry_response = {'id':id, 'timestamp': self.server.tick(), 'text':entry, 'pid': self.get_ip_address(), 'vc': self.server.vclock}
                 self.server.Entries[id] = entry_response
             self.retransmit(request_path, "POST", id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
-            id = parameters['id'][0]
-            self.server.Entries[id] = json.loads(parameters['entry'][0])
-
-            self.success_out()
+            pid = parameters['pid']
+            incoming_vclock = parameters['vc']
+            if(incoming_vclock[pid] != self.vclock[pid] + 1):
+                # not in order, put in buffer
+                print "putting in buffer"
+            else:
+                id = parameters['id'][0]
+                self.server.Entries[id] = json.loads(parameters['entry'][0])
+                self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
