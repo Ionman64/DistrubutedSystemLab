@@ -18,17 +18,107 @@ import uuid
 import json
 import time
 import random
+import sqlite3
+import os
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
 IP_ADDRESS_PREFIX = "10.1.0."
 PORT_NUMBER = 61001
 
+#For the database
+DATABASE_CREATE = 0
+DATABASE_MODIFY = 1
+DATABASE_DELETE = 2
+
 # debug variables
 DEBUG = False
 LOCALHOST = "127.0.0.1"
 PORT_PREFIX = "6100"
+DEBUG_MODE = True
+
 #------------------------------------------------------------------------------------------------------
+class DatabaseHandler:
+    def __init__(self, name):
+        self.database = (str(name) + ".sqlite")
+        if DEBUG_MODE:
+            print ("*************WARNING: DEBUG MODE ACTIVE**************")
+            if (os.path.exists(self.database)):
+                os.remove(self.database)
+                print ("DATABASE DELETserver_addressED")
+        if not os.path.exists(self.database):
+            conn = self.get_connection()
+            cur = conn.cursor()
+            print ("CREATED DATABASE")
+            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, unique(id, logical_timestamp))")
+            print ("CREATED TABLES")
+    def get_connection(self):
+        try:
+            return sqlite3.connect(self.database)
+        except Exception as ex:
+            raise Exception(ex)
+    def get_post(self, id, logical_timestamp):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        cur = cur.execute("SELECT entry FROM posts WHERE id = ? AND logical_timestamp = ?", (id, logical_timestamp))
+        for row in cur.fetchone():
+            return row
+        return None
+    def post_deleted(self, id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT 1 FROM posts WHERE id = ? AND action = ?", (id, self.action.DELETE_POST))
+            if cur.rowcount > 0:
+                return True
+            return False
+        except Exception as ex:
+            print(ex)
+            return False
+        finally:
+            conn.close()
+    def get_logical_clock(self, id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            cur = conn.execute("SELECT IFNULL(MAX(logical_timestamp), -1) FROM posts WHERE id = ?", [id])
+            if (cur.rowcount > 0):
+                return -1
+            for row in cur.fetchone():
+                return int(row)
+        except Exception as ex:
+            raise ex
+            print(ex)
+            return None
+        finally:
+            conn.close()
+    def save_post(self, id, entry, action, logical_timestamp=-1):
+        if (logical_timestamp == -1):
+            logical_timestamp = self.get_logical_clock(id)
+        if (logical_timestamp == None):
+            raise Exception("Could not get logical timestamp")
+            return
+        logical_timestamp += 1
+        if (action < 0 or action > 2):
+            print ("Illegal action")
+            return
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp) VALUES (?, ?, ?, ?)",(id, entry, action, logical_timestamp))
+            conn.commit()
+            if cur.rowcount > 0:
+                return True
+            return False
+        except Exception as ex:
+            print (ex)
+            return False
+        finally:
+            conn.close()
+
+
+            
+
 
 class BlackboardServer(HTTPServer):
 
@@ -41,6 +131,7 @@ class BlackboardServer(HTTPServer):
         self.vessel_id = node_id
         # The list of other vessels
         self.vessels = vessel_list
+        self.database = DatabaseHandler(node_id)
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
 
@@ -205,7 +296,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
         if request_path == "/board":
             keys = parameters.keys()
-            id = None
+            entry_id = None
             entry = None
             if 'entry' not in keys:
                 self.error_out("No entry parameter")
@@ -213,22 +304,24 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             entry = parameters['entry'][0]
             if 'id' not in keys:
                 # generate id if not provided (new entry)
-                id = str(uuid.uuid4())
+                entry_id = str(uuid.uuid4())
+                self.server.database.save_post(entry_id, entry, DATABASE_CREATE)
             else:
                 # get from parameters (modified entry)
-                id = parameters['id'][0]
+                entry_id = parameters['id'][0]
+                self.server.database.save_post(entry_id, entry, DATABASE_MODIFY)
             self.success_out()
 
             entry_response = {}
-            if id in self.server.Entries:
+            if entry_id in self.server.Entries:
                 #post is old, just update the text
-                self.server.Entries[id]["text"] = entry
-                entry_response = self.server.Entries[id]
+                self.server.Entries[entry_id]["text"] = entry
+                entry_response = self.server.Entries[entry_id]
             else:
                 #post is new, apply a timestamp to order the entry.
-                entry_response = {'id':id, 'timestamp': self.server.tick(), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
-                self.server.Entries[id] = entry_response
-            self.retransmit(request_path, "POST", id, json.dumps(entry_response))
+                entry_response = {'id':entry_id, 'timestamp': self.server.tick(), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
+                self.server.Entries[entry_id] = entry_response
+            self.retransmit(request_path, "POST", entry_id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
             content = json.loads(parameters['entry'][0])
@@ -237,13 +330,15 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             incoming_vclock = content['vc']
             self.server.update_clock(incoming_vclock)
             self.server.print_vclock()
-            #if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
+            if(incoming_vclock[pid] != self.server.vclock[pid] + 1):
+                self.server.database.save_post(id, entry, action, logical_timestamp)
                 # not in order, put in buffer
-            #    print "putting in buffer"
-            #else:
-            id = parameters['id'][0]
-            self.server.Entries[id] = json.loads(parameters['entry'][0])
-            self.success_out()
+                print "putting in buffer"
+            else:
+                self.server.vclock[pid] += 1
+                id = parameters['id'][0]
+                self.server.Entries[id] = json.loads(parameters['entry'][0])
+                self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
             id = self.path.replace("/propagate/entries/", "")
@@ -341,12 +436,10 @@ if __name__ == '__main__':
         vessel_id = int(sys.argv[1])
         for i in range(1, int(sys.argv[2])+1):
             vessel_list.append(PORT_PREFIX + str(i))
-
         # We launch a server
         port_nr = int(PORT_PREFIX + str(vessel_id))
         server = BlackboardServer((LOCALHOST, port_nr), BlackboardRequestHandler, vessel_id, vessel_list)
         print("Starting DEBUG server on port: %s:%d" % (LOCALHOST, port_nr))
-
     else:
         # We need to know the vessel IP
         vessel_id = int(sys.argv[1])
