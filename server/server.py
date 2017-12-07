@@ -30,6 +30,7 @@ PORT_NUMBER = 61001
 DATABASE_CREATE = 0
 DATABASE_MODIFY = 1
 DATABASE_DELETE = 2
+DATABASE_BUFFERED = 1
 
 # debug variables
 DEBUG = False
@@ -50,25 +51,27 @@ class DatabaseHandler:
             conn = self.get_connection()
             cur = conn.cursor()
             print ("CREATED DATABASE")
-            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, unique(id, logical_timestamp))")
+            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, buffered INT, unique(id, logical_timestamp))")
             print ("CREATED TABLES")
     def get_connection(self):
         try:
             return sqlite3.connect(self.database)
         except Exception as ex:
             raise Exception(ex)
-    def get_post(self, id, logical_timestamp):
+    def get_posts(self):
         conn = self.get_connection()
         cur = conn.cursor()
-        cur = cur.execute("SELECT entry FROM posts WHERE id = ? AND logical_timestamp = ?", (id, logical_timestamp))
-        for row in cur.fetchone():
+        cur = cur.execute("SELECT id, entry FROM posts")
+        entries = {"id":entry}
+        for row in cur.fetchall():
+            entries[row[0]] = row[1]
             return row
         return None
     def post_deleted(self, id):
         conn = self.get_connection()
         cur = conn.cursor()
         try:
-            cur.execute("SELECT 1 FROM posts WHERE id = ? AND action = ?", (id, self.action.DELETE_POST))
+            cur.execute("SELECT 1 FROM posts WHERE id = ? AND action = ?", (id, DATABASE_DELETE))
             if cur.rowcount > 0:
                 return True
             return False
@@ -92,7 +95,9 @@ class DatabaseHandler:
             return None
         finally:
             conn.close()
-    def save_post(self, id, entry, action, logical_timestamp=-1):
+    def save_post(self, id, entry, action, logical_timestamp=-1, buffered=0):
+        if self.post_deleted(id):
+            return False
         if (logical_timestamp == -1):
             logical_timestamp = self.get_logical_clock(id)
         if (logical_timestamp == None):
@@ -105,9 +110,10 @@ class DatabaseHandler:
         conn = self.get_connection()
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp) VALUES (?, ?, ?, ?)",(id, entry, action, logical_timestamp))
+            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, buffered) VALUES (?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, buffered))
             conn.commit()
             if cur.rowcount > 0:
+                self.fix_buffer_for_entry(id)
                 return True
             return False
         except Exception as ex:
@@ -115,10 +121,18 @@ class DatabaseHandler:
             return False
         finally:
             conn.close()
-
-
-            
-
+    def delete_post(self, id, logical_timestamp=-1):
+        self.save_post(id, "", DATABASE_DELETE, logical_timestamp)
+    def fix_buffer_for_entry(self, id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            #cur.execute("SELECT * FROM ")
+        except Exception as ex:
+            print (ex)
+            return
+        finally:
+            conn.close()
 
 class BlackboardServer(HTTPServer):
 
@@ -159,6 +173,7 @@ class BlackboardServer(HTTPServer):
     # We delete a value received from the store
     def delete_value_in_store(self,key):
         # we delete a value in the store if it exists
+        self.server.database.delete_post(id)
         del self.Entries[key]
 
 
@@ -302,31 +317,36 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.error_out("No entry parameter")
                 return
             entry = parameters['entry'][0]
+            action = None
             if 'id' not in keys:
                 # generate id if not provided (new entry)
                 entry_id = str(uuid.uuid4())
                 self.server.database.save_post(entry_id, entry, DATABASE_CREATE)
+                action = DATABASE_CREATE
             else:
                 # get from parameters (modified entry)
                 entry_id = parameters['id'][0]
                 self.server.database.save_post(entry_id, entry, DATABASE_MODIFY)
+                action = DATABASE_MODIFY
             self.success_out()
-
-            entry_response = {}
-            if entry_id in self.server.Entries:
-                #post is old, just update the text
-                self.server.Entries[entry_id]["text"] = entry
-                entry_response = self.server.Entries[entry_id]
-            else:
-                #post is new, apply a timestamp to order the entry.
-                entry_response = {'id':entry_id, 'timestamp': self.server.tick(), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
-                self.server.Entries[entry_id] = entry_response
+            entry_response = {'id':entry_id, 'action':action, 'logical_clock': self.server.tick(). "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
             self.retransmit(request_path, "POST", entry_id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
             content = json.loads(parameters['entry'][0])
-            print "content>> %s" % json.dumps(content)
-            #sender = content['pid']
+            entry_id = content["entry_id"]
+            entry = context["entry"]
+            logical_timestamp = content["logical_timestamp"]
+            action = content["action"]
+            if (logical_timestamp > self.server.database.get_logical_clock(entry_id)+1):
+                success = self.server.database.save_post(id, entry, action, logical_timestamp, DATABASE_BUFFERED)
+            else:
+                success = self.server.database.save_post(id, entry, action, logical_timestamp)
+            if success:
+                self.success_out()
+            else:
+                self.error_out()
+            return
             incoming_vclock = content['vc']
             self.server.update_clock(incoming_vclock)
             self.server.print_vclock()
@@ -339,11 +359,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 id = parameters['id'][0]
                 self.server.Entries[id] = json.loads(parameters['entry'][0])
                 self.success_out()
-
-        elif request_path.startswith("/propagate/entries/"):
-            id = self.path.replace("/propagate/entries/", "")
-            self.server.Entries[id] = parameters['entry'][0]
-            self.success_out()
 
 
     def success_out(self):
