@@ -62,7 +62,7 @@ class DatabaseHandler:
         conn = self.get_connection()
         cur = conn.cursor()
         cur = cur.execute("SELECT id, entry FROM posts")
-        entries = {"id":entry}
+        entries = {"id": "ph"}
         for row in cur.fetchall():
             entries[row[0]] = row[1]
             return row
@@ -123,6 +123,7 @@ class DatabaseHandler:
             conn.close()
     def delete_post(self, id, logical_timestamp=-1):
         self.save_post(id, "", DATABASE_DELETE, logical_timestamp)
+<<<<<<< HEAD
     # def fix_buffer_for_entry(self, id):
     #     conn = self.get_connection()
     #     cur = conn.cursor()
@@ -133,6 +134,19 @@ class DatabaseHandler:
     #         return
     #     finally:
     #         conn.close()
+=======
+    def fix_buffer_for_entry(self, id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            #cur.execute("SELECT * FROM ")
+            pass
+        except Exception as ex:
+            print (ex)
+            return
+        finally:
+            conn.close()
+>>>>>>> 215864678b812d06c555200bd4bf9268952e281a
 
 class BlackboardServer(HTTPServer):
 
@@ -329,16 +343,17 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 self.server.database.save_post(entry_id, entry, DATABASE_MODIFY)
                 action = DATABASE_MODIFY
             self.success_out()
-            entry_response = {'id':entry_id, 'action':action, 'logical_clock': self.server.tick(). "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
+            entry_response = {'id':entry_id, 'action':action, 'logical_clock': self.server.tick(), "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
             self.retransmit(request_path, "POST", entry_id, json.dumps(entry_response))
 
         elif request_path == "/propagate/board":
             content = json.loads(parameters['entry'][0])
-            entry_id = content["entry_id"]
-            entry = context["entry"]
+            id = content["id"]
+            entry = content["text"]
+            pid = content['pid']
             logical_timestamp = content["logical_timestamp"]
             action = content["action"]
-            if (logical_timestamp > self.server.database.get_logical_clock(entry_id)+1):
+            if (logical_timestamp > self.server.database.get_logical_clock(id)+1):
                 success = self.server.database.save_post(id, entry, action, logical_timestamp, DATABASE_BUFFERED)
             else:
                 success = self.server.database.save_post(id, entry, action, logical_timestamp)
