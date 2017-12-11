@@ -113,7 +113,7 @@ class DatabaseHandler:
             cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, buffered) VALUES (?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, buffered))
             conn.commit()
             if cur.rowcount > 0:
-                self.fix_buffer_for_entry(id)
+                #self.fix_buffer_for_entry(id)
                 return True
             return False
         except Exception as ex:
@@ -123,16 +123,16 @@ class DatabaseHandler:
             conn.close()
     def delete_post(self, id, logical_timestamp=-1):
         self.save_post(id, "", DATABASE_DELETE, logical_timestamp)
-    def fix_buffer_for_entry(self, id):
-        conn = self.get_connection()
-        cur = conn.cursor()
-        try:
-            #cur.execute("SELECT * FROM ")
-        except Exception as ex:
-            print (ex)
-            return
-        finally:
-            conn.close()
+    # def fix_buffer_for_entry(self, id):
+    #     conn = self.get_connection()
+    #     cur = conn.cursor()
+    #     try:
+    #         cur.execute("SELECT * FROM ")
+    #     except Exception as ex:
+    #         print (ex)
+    #         return
+    #     finally:
+    #         conn.close()
 
 class BlackboardServer(HTTPServer):
 
