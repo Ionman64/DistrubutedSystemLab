@@ -46,7 +46,7 @@ class DatabaseHandler:
             print ("*************WARNING: DEBUG MODE ACTIVE**************")
             if (os.path.exists(self.database)):
                 os.remove(self.database)
-                print ("DATABASE DELETserver_addressED")
+                print ("DATABASE DELETED")
         if not os.path.exists(self.database):
             conn = self.get_connection()
             cur = conn.cursor()
@@ -123,7 +123,6 @@ class DatabaseHandler:
             conn.close()
     def delete_post(self, id, logical_timestamp=-1):
         self.save_post(id, "", DATABASE_DELETE, logical_timestamp)
-<<<<<<< HEAD
     # def fix_buffer_for_entry(self, id):
     #     conn = self.get_connection()
     #     cur = conn.cursor()
@@ -134,19 +133,6 @@ class DatabaseHandler:
     #         return
     #     finally:
     #         conn.close()
-=======
-    def fix_buffer_for_entry(self, id):
-        conn = self.get_connection()
-        cur = conn.cursor()
-        try:
-            #cur.execute("SELECT * FROM ")
-            pass
-        except Exception as ex:
-            print (ex)
-            return
-        finally:
-            conn.close()
->>>>>>> 215864678b812d06c555200bd4bf9268952e281a
 
 class BlackboardServer(HTTPServer):
 
