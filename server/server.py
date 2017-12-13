@@ -20,6 +20,7 @@ import time
 import random
 import sqlite3
 import os
+from collections import OrderedDict
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
@@ -53,19 +54,24 @@ class DatabaseHandler:
             print ("CREATED DATABASE")
             cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, sequence_number INT, unique(id, logical_timestamp))")
             print ("CREATED TABLES")
+
     def get_connection(self):
         try:
             return sqlite3.connect(self.database)
         except Exception as ex:
             raise Exception(ex)
+
     def get_posts(self):
         conn = self.get_connection()
         cur = conn.cursor()
-        cur = cur.execute("SELECT id, entry, sequence_number FROM posts WHERE action != 2 GROUP BY id ORDER BY logical_timestamp, sequence_number DESC")
-        entries = {}
+
+        get_all_query = "SELECT id, entry, sequence_number FROM posts GROUP BY id HAVING action != 2 ORDER BY sequence_number, logical_timestamp"
+        cur = cur.execute(get_all_query)
+        entries = OrderedDict()
         for row in cur.fetchall():
             entries[row[0]] = {"id":row[0], "text":row[1], "seq":row[2]}
         return entries
+
     def post_deleted(self, id):
         conn = self.get_connection()
         cur = conn.cursor()
@@ -79,6 +85,7 @@ class DatabaseHandler:
             return False
         finally:
             conn.close()
+
     def get_logical_clock(self, id):
         conn = self.get_connection()
         cur = conn.cursor()
@@ -94,6 +101,7 @@ class DatabaseHandler:
             return None
         finally:
             conn.close()
+
     def save_post(self, id, entry, action, logical_timestamp=-1, sequence_number=0):
         if self.post_deleted(id):
             return False
@@ -109,6 +117,12 @@ class DatabaseHandler:
         conn = self.get_connection()
         cur = conn.cursor()
         try:
+
+            if action == DATABASE_MODIFY:
+                # keep the same seq_number
+                cur.execute('SELECT sequence_number FROM posts WHERE id=?', (id,))
+                sequence_number = cur.fetchone()[0]
+
             cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, sequence_number) VALUES (?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, sequence_number))
             conn.commit()
             if cur.rowcount > 0:
@@ -120,18 +134,9 @@ class DatabaseHandler:
             return False
         finally:
             conn.close()
+
     def delete_post(self, id, logical_timestamp=-1, sequence_number=0):
         self.save_post(id, "", DATABASE_DELETE, logical_timestamp, )
-    # def fix_buffer_for_entry(self, id):
-    #     conn = self.get_connection()
-    #     cur = conn.cursor()
-    #     try:
-    #         cur.execute("SELECT * FROM ")
-    #     except Exception as ex:
-    #         print (ex)
-    #         return
-    #     finally:
-    #         conn.close()
 
 class BlackboardServer(HTTPServer):
 
@@ -333,7 +338,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             content = json.loads(parameters['entry'][0])
             id = content["id"]
             entry = content["text"]
-            pid = content['pid']
+            #pid = content['pid']
             logical_timestamp = content["logical_timestamp"]
             action = content["action"]
             incoming_vclock = content['vc']
@@ -341,7 +346,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.server.update_clock(incoming_vclock)
             self.server.print_vclock()
             self.server.database.save_post(id, entry, action, logical_timestamp, self.server.vclock[self.server.get_ip_address()])
-            
+
 
 
     def success_out(self):
