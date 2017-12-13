@@ -51,7 +51,7 @@ function load_board_ajax() {
 				var input = el("input");
 				input.type = "number";
 				input.name = "order";
-				input.value = key;
+				input.value = item.seq;
 				input.readonly = true;
 				board_entry.appendChild(input);
 				var input = el("input");
@@ -82,25 +82,6 @@ function load_board_ajax() {
 		},
 		complete:function() {
 			console.log("updated board");
-		}
-	});
-}
-function get_leader_ajax() {
-	$.ajax({
-		url:"/leader",
-		method:"GET",
-		dataType:"JSON",
-		crossOrigin:true,
-		success:function(data, status) {
-			if (!data.success) {
-				console.log("error finding leader");
-				return;
-			}
-			$("#leader").html(data.leader);
-			$("#randomNumber").html(data.randomNumber);
-		},
-		error: function() {
-			console.log("could not reach leader");
 		}
 	});
 }
@@ -158,7 +139,6 @@ function reload_countdown(remaining) {
     if (remaining <= 0) {
         remaining = page_reload_timeout;
         load_board_ajax();
-		get_leader_ajax();
     }
     setTimeout(function() {
         reload_countdown(remaining - 1);
@@ -231,8 +211,6 @@ footer {
 		It will be reloaded automatically from the server -->
 		<!-- This place shows the status of the auto-reload.
 		An error shown here means the server is not responding -->
-		<h2>Leader: <span id="leader">None Yet</span></h2>
-		<h4>Selected with: <span id="randomNumber">None Yet</span></h4>
 		<section id="boardcontents_status_placeholder">0: success</section>
 
 		<!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->
