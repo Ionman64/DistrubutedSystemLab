@@ -35,12 +35,12 @@ class SimpleTestCase(unittest.TestCase):
         data = json.loads(r.text)
         POST_ID = data["id"]
         assert r.status_code == 200 '''
-    def testStress(self):
+    def testStressTest(self):
         NUMBER_OF_NODES = 4
         NUMBER_OF_MESSAGES = 50
         success = True
         for i in range(NUMBER_OF_NODES):
-            ip_address = "http://10.1.0.%i:61001/board" % i+1
+            ip_address = "http://10.1.0.%s:61001/board" % str(i+1)
             for k in range(NUMBER_OF_MESSAGES):
                 r = requests.post(ip_address, data={'entry': "I am %s sending %i" % (ip_address, i)})
             if success:
