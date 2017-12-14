@@ -1,7 +1,6 @@
 import unittest
 import requests
 import json
-import
 
 POST_ID = None
 
