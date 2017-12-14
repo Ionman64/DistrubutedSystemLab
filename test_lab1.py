@@ -35,7 +35,7 @@ class SimpleTestCase(unittest.TestCase):
         data = json.loads(r.text)
         POST_ID = data["id"]
         assert r.status_code == 200 '''
-    def stressTest(self):
+    def testStress(self):
         NUMBER_OF_NODES = 4
         NUMBER_OF_MESSAGES = 50
         success = True
