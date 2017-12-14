@@ -16,8 +16,6 @@ from codecs import open # Open a file
 from threading import  Thread # Thread Management
 import uuid
 import json
-import time
-import random
 import sqlite3
 import os
 from collections import OrderedDict
@@ -52,7 +50,7 @@ class DatabaseHandler:
             conn = self.get_connection()
             cur = conn.cursor()
             print ("CREATED DATABASE")
-            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, sequence_number INT, unique(id, logical_timestamp))")
+            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, sequence_number INT, modified_by VARCHAR(16), unique(id, logical_timestamp))")
             print ("CREATED TABLES")
 
     def get_connection(self):
@@ -64,12 +62,11 @@ class DatabaseHandler:
     def get_posts(self):
         conn = self.get_connection()
         cur = conn.cursor()
-
-        get_all_query = "SELECT id, entry, sequence_number FROM posts GROUP BY id HAVING action != 2 ORDER BY sequence_number, logical_timestamp"
-        cur = cur.execute(get_all_query)
+        get_all_except_deleted_query = "SELECT id, entry, sequence_number, modified_by FROM posts GROUP BY id HAVING action != 2 ORDER BY sequence_number, modified_by"
+        cur = cur.execute(get_all_except_deleted_query)
         entries = OrderedDict()
         for row in cur.fetchall():
-            entries[row[0]] = {"id":row[0], "text":row[1], "seq":row[2]}
+            entries[row[0]] = {"id":row[0], "text":row[1], "seq":row[2], "modified_by": row[3]}
         return entries
 
     def post_deleted(self, id):
@@ -102,7 +99,7 @@ class DatabaseHandler:
         finally:
             conn.close()
 
-    def save_post(self, id, entry, action, logical_timestamp=-1, sequence_number=0):
+    def save_post(self, id, entry, action, logical_timestamp=-1, sequence_number=0, modified_by = 0):
         if self.post_deleted(id):
             return False
         if (logical_timestamp == -1):
@@ -119,11 +116,11 @@ class DatabaseHandler:
         try:
 
             if action == DATABASE_MODIFY:
-                # keep the same seq_number
+                # keep the same seq_number if entry is modified
                 cur.execute('SELECT sequence_number FROM posts WHERE id=?', (id,))
                 sequence_number = cur.fetchone()[0]
 
-            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, sequence_number) VALUES (?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, sequence_number))
+            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, sequence_number, modified_by) VALUES (?, ?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, sequence_number, modified_by))
             conn.commit()
             if cur.rowcount > 0:
                 #self.fix_buffer_for_entry(id)
@@ -160,9 +157,10 @@ class BlackboardServer(HTTPServer):
 
 
     def update_clock(self, other_clock):
+        self.tick()
         for k, v in other_clock.items():
             self.vclock[k] = max(self.vclock[k], v) # choose highest value
-        self.tick()
+
 
     def print_vclock(self):
         for k, v in self.vclock.items():
@@ -319,33 +317,33 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.success_out()
             entry = parameters['entry'][0]
             action = None
-            tick = self.server.tick()
-            print ("TICK : %i" % tick)
+            tick = self.server.tick() # tick vector clock on the new event
+
             if 'id' not in keys:
                 # generate id if not provided (new entry)
                 entry_id = str(uuid.uuid4())
-                self.server.database.save_post(entry_id, entry, DATABASE_CREATE, -1, tick)
+                self.server.database.save_post(entry_id, entry, DATABASE_CREATE, -1, tick, self.server.get_ip_address())
                 action = DATABASE_CREATE
             else:
                 # get from parameters (modified entry)
                 entry_id = parameters['id'][0]
-                self.server.database.save_post(entry_id, entry, DATABASE_MODIFY, self.server.database.get_logical_clock(entry_id), tick)
+                self.server.database.save_post(entry_id, entry, DATABASE_MODIFY, self.server.database.get_logical_clock(entry_id), tick, self.server.get_ip_address())
                 action = DATABASE_MODIFY
-            entry_response = {'id':entry_id, 'action':action, 'logical_clock': self.server.vclock[self.server.get_ip_address()], "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
-            self.retransmit(request_path, "POST", entry_id, json.dumps(entry_response))
+
+            retransmit_msg = {'id':entry_id, 'action':action, "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
+            self.retransmit(request_path, "POST", entry_id, json.dumps(retransmit_msg))
 
         elif request_path == "/propagate/board":
             content = json.loads(parameters['entry'][0])
             id = content["id"]
             entry = content["text"]
-            #pid = content['pid']
+            modified_by = content['pid']
             logical_timestamp = content["logical_timestamp"]
             action = content["action"]
             incoming_vclock = content['vc']
             self.success_out()
             self.server.update_clock(incoming_vclock)
-            self.server.print_vclock()
-            self.server.database.save_post(id, entry, action, logical_timestamp, self.server.vclock[self.server.get_ip_address()])
+            self.server.database.save_post(id, entry, action, logical_timestamp, self.server.vclock[modified_by], modified_by)
 
 
 

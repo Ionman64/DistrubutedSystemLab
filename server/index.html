@@ -55,6 +55,12 @@ function load_board_ajax() {
 				input.readonly = true;
 				board_entry.appendChild(input);
 				var input = el("input");
+				input.type = "number";
+				input.name = "modified_by";
+				input.value = item.modified_by;
+				input.readonly = true;
+				board_entry.appendChild(input);
+				var input = el("input");
 				input.type = "text";
 				input.name = "id";
 				input.value = item.id;
