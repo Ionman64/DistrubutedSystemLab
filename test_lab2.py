@@ -36,7 +36,7 @@ class SimpleTestCase(unittest.TestCase):
         POST_ID = data["id"]
         assert r.status_code == 200 '''
     def testStressTest(self):
-        NUMBER_OF_NODES = 8
+        NUMBER_OF_NODES = 6
         NUMBER_OF_MESSAGES = 50
         success = True
         for k in range(NUMBER_OF_MESSAGES):
