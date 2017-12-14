@@ -92,7 +92,7 @@ class Lab1():
 
 		nbOfServersPerRegion = 2 # 5
 		nbOfClientsPerRegion = 2 # 2
-		nbOfRegions = 1 # 2
+		nbOfRegions = 2 # 2
 
 		localJitter = 10 # ms, the evolution of the time between two consecutive packets
 		# We create the topology
