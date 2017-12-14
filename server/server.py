@@ -19,6 +19,8 @@ import json
 import sqlite3
 import os
 from collections import OrderedDict
+from datetime import datetime
+
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
@@ -36,6 +38,14 @@ DEBUG = False
 LOCALHOST = "127.0.0.1"
 PORT_PREFIX = "6100"
 DEBUG_MODE = True
+
+#perf testing
+MESSAGE_COUNT = 200
+def new_message():
+    global MESSAGE_COUNT
+    MESSAGE_COUNT = MESSAGE_COUNT - 1
+    if MESSAGE_COUNT == 0:
+        print ("TIME TO EVENTUAL CONSISTANCY: %s" % str(datetime.now()))
 
 #------------------------------------------------------------------------------------------------------
 class DatabaseHandler:
@@ -319,7 +329,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             entry = parameters['entry'][0]
             action = None
             tick = self.server.tick() # tick vector clock on the new event
-
+            new_message()
             if 'id' not in keys:
                 # generate id if not provided (new entry)
                 entry_id = str(uuid.uuid4())
@@ -335,6 +345,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.retransmit(request_path, "POST", entry_id, json.dumps(retransmit_msg))
 
         elif request_path == "/propagate/board":
+            new_message()
             content = json.loads(parameters['entry'][0])
             id = content["id"]
             entry = content["text"]
@@ -372,6 +383,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
     def do_DELETE(self):
+        new_message()
         print("Receiving a DELETE on %s" % self.path)
         parameters = self.parse_POST_request()
         request_path = self.path
@@ -388,8 +400,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             else:
                 #return not found
                 self.error_out("Not found", 404)
+            
 
         elif request_path.startswith("/propagate/board"):
+            new_message()
             if 'id' not in keys:
                 self.error_out("missing id")
                 print ("Propagate!:NOKEY")

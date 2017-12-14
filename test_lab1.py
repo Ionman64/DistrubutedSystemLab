@@ -1,6 +1,7 @@
 import unittest
 import requests
 import json
+import
 
 POST_ID = None
 
@@ -12,7 +13,7 @@ class SimpleTestCase(unittest.TestCase):
     def tearDown(self):
         """Call after every test case."""
 
-    def testBoard(self):
+    ''' def testBoard(self):
         r = requests.get("http://10.1.0.1:61001/board")
         assert r.status_code == 200
     def testEntryAndModify(self):
@@ -34,7 +35,19 @@ class SimpleTestCase(unittest.TestCase):
         r = requests.post("http://10.1.0.1:61001/board", data={'entry': "banana"})
         data = json.loads(r.text)
         POST_ID = data["id"]
-        assert r.status_code == 200
+        assert r.status_code == 200 '''
+    def stressTest(self):
+        NUMBER_OF_NODES = 4
+        NUMBER_OF_MESSAGES = 50
+        success = True
+        for i in range(NUMBER_OF_NODES):
+            ip_address = "http://10.1.0.%i:61001/board" % i+1
+            for k in range(NUMBER_OF_MESSAGES):
+                r = requests.post(ip_address, data={'entry': "I am %s sending %i" % (ip_address, i)})
+            if success:
+                success = (r.status_code == 200)
+        assert success
+         
 
         #r = requests.delete("http://10.1.0.1:61001/board/%s" % POST_ID)
         #assert r.status_code == 200
