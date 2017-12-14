@@ -90,7 +90,7 @@ class Lab1():
 		#nbOfClientsPerRegion = 2
 		#nbOfRegions = 2
 
-		nbOfServersPerRegion = 3 # 5
+		nbOfServersPerRegion = 4 # 5
 		nbOfClientsPerRegion = 2 # 2
 		nbOfRegions = 2 # 2
 

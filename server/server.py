@@ -42,7 +42,7 @@ DEBUG_MODE = True
 #perf testing
 START_TIME = str(datetime.now())
 
-NUMBER_OF_NODES = 6
+NUMBER_OF_NODES = 8
 NUMBER_OF_MESSAGES = 50
 MESSAGE_COUNT = NUMBER_OF_MESSAGES * NUMBER_OF_NODES
 def new_message():
