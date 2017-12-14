@@ -39,9 +39,9 @@ class SimpleTestCase(unittest.TestCase):
         NUMBER_OF_NODES = 4
         NUMBER_OF_MESSAGES = 50
         success = True
-        for i in range(NUMBER_OF_NODES):
+        for k in range(NUMBER_OF_MESSAGES):
             ip_address = "http://10.1.0.%s:61001/board" % str(i+1)
-            for k in range(NUMBER_OF_MESSAGES):
+            for i in range(NUMBER_OF_NODES):
                 r = requests.post(ip_address, data={'entry': "I am %s sending %i" % (ip_address, i)})
             if success:
                 success = (r.status_code == 200)
