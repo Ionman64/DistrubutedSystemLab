@@ -281,6 +281,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 # get from parameters (modified entry)
                 id = parameters['id'][0]
             entry_response = {}
+            new_message()
             self.success_out()
             if self.server.get_ip_address() == self.server.leader:
                 entry_response = {}
@@ -308,11 +309,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         #   Cost for post = N = number of vessels
 
         elif request_path == "/propagate/board":
+            new_message()
             id = parameters['id'][0]
             self.server.Entries[id] = json.loads(parameters['entry'][0])
             self.success_out()
 
         elif request_path.startswith("/propagate/entries/"):
+            new_message()
             id = self.path.replace("/propagate/entries/", "")
             self.server.Entries[id] = parameters['entry'][0]
             self.success_out()
@@ -372,6 +375,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
     def do_DELETE(self):
+        new_message()
         print("Receiving a DELETE on %s" % self.path)
         parameters = self.parse_POST_request()
         request_path = self.path
