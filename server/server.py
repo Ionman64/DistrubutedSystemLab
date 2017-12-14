@@ -16,20 +16,33 @@ from codecs import open # Open a file
 from threading import  Thread # Thread Management
 import uuid
 import json
-import time
-import random
+import sqlite3
+import os
+from collections import OrderedDict
 from datetime import datetime
+
 
 #------------------------------------------------------------------------------------------------------
 # Static variables definitions
 IP_ADDRESS_PREFIX = "10.1.0."
 PORT_NUMBER = 61001
-#------------------------------------------------------------------------------------------------------
+
+#For the database
+DATABASE_CREATE = 0
+DATABASE_MODIFY = 1
+DATABASE_DELETE = 2
+DATABASE_BUFFERED = 1
+
+# debug variables
+DEBUG = False
+LOCALHOST = "127.0.0.1"
+PORT_PREFIX = "6100"
+DEBUG_MODE = True
 
 #perf testing
 START_TIME = str(datetime.now())
 
-NUMBER_OF_NODES = 4
+NUMBER_OF_NODES = 8
 NUMBER_OF_MESSAGES = 50
 MESSAGE_COUNT = NUMBER_OF_MESSAGES * NUMBER_OF_NODES
 def new_message():
@@ -38,9 +51,107 @@ def new_message():
     if MESSAGE_COUNT == 0:
         print ("TIME TO EVENTUAL CONSISTANCY: \n START: %s \n END: % s" % (START_TIME, str(datetime.now())))
 
+#------------------------------------------------------------------------------------------------------
+class DatabaseHandler:
+    def __init__(self, name):
+        self.database = (str(name) + ".sqlite")
+        if DEBUG_MODE:
+            print ("*************WARNING: DEBUG MODE ACTIVE**************")
+            if (os.path.exists(self.database)):
+                os.remove(self.database)
+                print ("DATABASE DELETED")
+        if not os.path.exists(self.database):
+            conn = self.get_connection()
+            cur = conn.cursor()
+            print ("CREATED DATABASE")
+            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, sequence_number INT, modified_by VARCHAR(16), unique(id, logical_timestamp))")
+            print ("CREATED TABLES")
+
+    def get_connection(self):
+        try:
+            return sqlite3.connect(self.database)
+        except Exception as ex:
+            raise Exception(ex)
+
+    def get_posts(self):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        get_all_except_deleted_query = "SELECT id, entry, sequence_number, modified_by FROM posts GROUP BY id HAVING action != 2 ORDER BY sequence_number, modified_by"
+        cur = cur.execute(get_all_except_deleted_query)
+        entries = OrderedDict()
+        for row in cur.fetchall():
+            entries[row[0]] = {"id":row[0], "text":row[1], "seq":row[2], "modified_by": row[3]}
+        return entries
+
+    def post_deleted(self, id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT 1 FROM posts WHERE id = ? AND action = ?", (id, DATABASE_DELETE))
+            if cur.rowcount > 0:
+                return True
+            return False
+        except Exception as ex:
+            print(ex)
+            return False
+        finally:
+            conn.close()
+
+    def get_logical_clock(self, id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+            cur = conn.execute("SELECT IFNULL(MAX(logical_timestamp), -1) FROM posts WHERE id = ?", [id])
+            if (cur.rowcount > 0):
+                return -1
+            for row in cur.fetchone():
+                return int(row)
+        except Exception as ex:
+            raise ex
+            print(ex)
+            return None
+        finally:
+            conn.close()
+
+    def save_post(self, id, entry, action, logical_timestamp=-1, sequence_number=0, modified_by = 0):
+        print ("MODIFIED BY %s" % modified_by)
+        if self.post_deleted(id):
+            return False
+        if (logical_timestamp == -1):
+            logical_timestamp = self.get_logical_clock(id)
+        if (logical_timestamp == None):
+            raise Exception("Could not get logical timestamp")
+            return
+        logical_timestamp += 1
+        if (action < 0 or action > 2):
+            print ("Illegal action")
+            return
+        conn = self.get_connection()
+        cur = conn.cursor()
+        try:
+
+            if action == DATABASE_MODIFY:
+                # keep the same seq_number if entry is modified
+                cur.execute('SELECT sequence_number FROM posts WHERE id=?', (id,))
+                sequence_number = cur.fetchone()[0]
+
+            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, sequence_number, modified_by) VALUES (?, ?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, sequence_number, modified_by))
+            conn.commit()
+            if cur.rowcount > 0:
+                #self.fix_buffer_for_entry(id)
+                return True
+            return False
+        except Exception as ex:
+            print (ex)
+            return False
+        finally:
+            conn.close()
+
+    def delete_post(self, id, logical_timestamp=-1, sequence_number=0):
+        self.save_post(id, "", DATABASE_DELETE, logical_timestamp, )
 
 class BlackboardServer(HTTPServer):
-#------------------------------------------------------------------------------------------------------
+
     def __init__(self, server_address, handler, node_id, vessel_list):
     # We call the super init
         HTTPServer.__init__(self,server_address, handler)
@@ -48,49 +159,48 @@ class BlackboardServer(HTTPServer):
         self.Entries = {}
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
-        self.leader = None
-        self.failedLeaders = 0
         # The list of other vessels
         self.vessels = vessel_list
-        self.identifier = str(random.random()*99999)
-        self.finger_table = {self.identifier:self.get_ip_address()}
-        if len(vessel_list) > 1:
-            self.initiateElection()
-#------------------------------------------------------------------------------------------------------
+        self.database = DatabaseHandler(node_id)
+        # Create vector clock and initalize all to 0
+        self.vclock = dict.fromkeys(self.vessels, 0)
+
+    def tick(self):
+        this_vessel = self.get_ip_address()
+        self.vclock[this_vessel] = self.vclock[this_vessel] + 1
+        return self.vclock[this_vessel]
+
+
+    def update_clock(self, other_clock):
+        self.tick()
+        for k, v in other_clock.items():
+            self.vclock[k] = max(self.vclock[k], v) # choose highest value
+
+
+    def print_vclock(self):
+        for k, v in self.vclock.items():
+            print (k, v)
+
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
         self.socket.close()
         HTTPServer.shutdown(self)
-#------------------------------------------------------------------------------------------------------
+
+
     # We delete a value received from the store
     def delete_value_in_store(self,key):
         # we delete a value in the store if it exists
-        del self.Entries[key]
+        self.database.delete_post(key, self.database.get_logical_clock(key), self.vclock[self.get_ip_address()])
 
-    def initiateElection(self):
-        thread = Thread(target=self.election)
-        # We kill the process if we kill the server
-        thread.daemon = True
-        # We start the thread
-        thread.start()
-
-    def find_neighbour(self):
-        return "%s%d" % (IP_ADDRESS_PREFIX, (self.vessel_id % len(self.vessels)+1))
 
     def get_ip_address(self):
+        if DEBUG:
+            # use port instead of ip when running all vessels locally
+            return PORT_PREFIX + str(self.vessel_id)
         return IP_ADDRESS_PREFIX + str(self.vessel_id)
 
-#---------------------------------------------------------------------------------
-# LAB 2 election
-    def election(self):
-        if len(self.vessels) == 0:
-            return
-        time.sleep(1)
-        print ("Initiating Election")
-        print ("I am %s and my neighbour is %s" % (self.vessel_id, (self.vessel_id % len(self.vessels)) +1))
-        self.contact_vessel_for_election(self.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(self.finger_table))
-#------------------------------------------------------------------------------------------------------
-# Contact a specific vessel with a set of variables to transmit to it
+
+    # Contact a specific vessel with a set of variables to transmit to it
     def contact_vessel(self, vessel_ip, path, action_type, key, value):
         # the Boolean variable we will return
         success = False
@@ -102,43 +212,11 @@ class BlackboardServer(HTTPServer):
         try:
             # We contact vessel:PORT_NUMBER since we all use the same port
             # We can set a timeout, after which the connection fails if nothing happened
-            connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
-            # We send the HTTP request
-            connection.request(action_type, path, post_content, headers)
-            # We retrieve the response
-            response = connection.getresponse()
-            # We want to check the status, the body should be empty
-            status = response.status
-            # If we receive a HTTP 200 - OK
-            if status == 200:
-                success = True
-        # We catch every possible exceptions
-        except TimeoutError as e:
-            self.failedLeaders = self.failedLeaders + 1
-            self.leader = self.finger_table[sorted(self.finger_table)[self.leaderNum]]
-            self.contact_vessel(self, vessel_ip, path, action_type, key, value)
-            #Here we should retransmit to the next vessel in the finger table
-        except Exception as e:
-            print "Error while contacting %s" % vessel_ip
-            # printing the error given by Python
-            print(e)
-
-        # we return if we succeeded or not
-        return success
-    def contact_vessel_for_election(self, vessel_ip, path, action_type, key, value):
-        # the Boolean variable we will return
-        success = False
-        # The variables must be encoded in the URL format, through urllib.urlencode
-        post_content = urlencode({key:value})
-        # the HTTP header must contain the type of data we are transmitting, here URL encoded
-        headers = {"Content-type": "application/x-www-form-urlencoded"}
-        # We should try to catch errors when contacting the vessel
-        try:
-            # We contact vessel:PORT_NUMBER since we all use the same port
-            # We can set a timeout, after which the connection fails if nothing happened
-            connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
-            # We only use POST to send data (PUT and DELETE not supported)
-            #action_type = "POST"
+            if DEBUG:
+                # vessel_ip is portnr here
+                connection = HTTPConnection("%s:%s" % (LOCALHOST, vessel_ip), timeout = 30)
+            else:
+                connection = HTTPConnection("%s:%d" % (vessel_ip, PORT_NUMBER), timeout = 30)
             # We send the HTTP request
             connection.request(action_type, path, post_content, headers)
             # We retrieve the response
@@ -156,7 +234,8 @@ class BlackboardServer(HTTPServer):
 
         # we return if we succeeded or not
         return success
-#------------------------------------------------------------------------------------------------------
+
+
     # We send a received value to all the other vessels of the system
     def propagate_value_to_vessels(self, path, action_type, key, value, ):
         # We iterate through the vessel list
@@ -168,7 +247,7 @@ class BlackboardServer(HTTPServer):
                 print "---> propagating to %s" % vessel
                 self.contact_vessel(vessel, path, action_type, key, value)
 
-#------------------------------------------------------------------------------------------------------
+
 #------------------------------------------------------------------------------------------------------
 # This class implements the logic when a server receives a GET or POST request
 # It can access to the server data through self.server.*
@@ -189,7 +268,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         #self.send_header("Content-type","text/html")
         # No more important headers, we can close them
         self.end_headers()
-#------------------------------------------------------------------------------------------------------
+
+
     # a POST request must be parsed through urlparse.parse_QS, since the content is URL encoded
     def parse_POST_request(self):
         post_data = ""
@@ -199,7 +279,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         post_data = parse_qs(self.rfile.read(length), keep_blank_values=1)
         # we return the data
         return post_data
-#------------------------------------------------------------------------------------------------------
+
 #------------------------------------------------------------------------------------------------------
 # Request handling - GET
 #------------------------------------------------------------------------------------------------------
@@ -212,16 +292,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/board":
             self.do_GET_Board()
 
-        elif self.path == "/entries":
-            self.do_GET_Entries()
-
-        elif self.path == "/leader":
-            self.set_HTTP_headers(200)
-            if (server.leader == None):
-                self.wfile.write(json.dumps({"success":False, "reason":"No leader yet"}))
-            else:
-                self.wfile.write(json.dumps({"success":True, "leader":server.leader, "randomNumber":str(server.finger_table)}))
-
         # Default?
         else:
             self.do_GET_Index()
@@ -229,22 +299,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 #------------------------------------------------------------------------------------------------------
 # GET logic - specific path
 #------------------------------------------------------------------------------------------------------
-    def do_GET_Entries(self):
-        self.set_HTTP_headers(200)
-        self.wfile.write(self.gen_entries_html)
-
-    def gen_entries_html(self):
-        html_response = ""
-        for key, value in self.server.Entries.iteritems():
-            html_response += entry_template % ("entries/", key, value )
-        return html_response
 
     def do_GET_Board(self):
         self.set_HTTP_headers(200)
-        temp_entries = []
-        for item in sorted(self.server.Entries.values(), key=return_entry_timestamp, reverse=True):
-            temp_entries.append(item)
-        self.wfile.write(json.dumps(temp_entries))
+        self.wfile.write(json.dumps(self.server.database.get_posts()))
 
     def do_GET_Index(self):
         #output index.html
@@ -252,9 +310,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(index)
 
 
-#------------------------------------------------------------------------------------------------------
-    # we might want some other functions
-#------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
 # Request handling - POST
 #------------------------------------------------------------------------------------------------------
@@ -264,69 +319,49 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # and set the headers for the client
         request_path = self.path
         parameters = self.parse_POST_request()
+        print("Receiving a POST on %s" % self.path)
         print "parameters: %s" % parameters
         self.set_HTTP_headers(200)
         if request_path == "/board":
             keys = parameters.keys()
-            id = None
+            entry_id = None
             entry = None
             if 'entry' not in keys:
                 self.error_out("No entry parameter")
                 return
+            self.success_out()
             entry = parameters['entry'][0]
+            action = None
+            tick = self.server.tick() # tick vector clock on the new event
+            new_message()
             if 'id' not in keys:
                 # generate id if not provided (new entry)
-                id = str(uuid.uuid4())
+                entry_id = str(uuid.uuid4())
+                self.server.database.save_post(entry_id, entry, DATABASE_CREATE, -1, tick, self.server.get_ip_address())
+                action = DATABASE_CREATE
             else:
                 # get from parameters (modified entry)
-                id = parameters['id'][0]
-            entry_response = {}
-            self.success_out()
-            if self.server.get_ip_address() == self.server.leader:
-                entry_response = {}
-                #I am the leader
-                if id in self.server.Entries:
-                    #post is old, just update the text
-                    self.server.Entries[id]["text"] = entry
-                    entry_response = self.server.Entries[id]
-                else:
-                    #post is new, apply a timestamp to order the entry.
-                    entry_response = {'id':id, 'timestamp':time.time(), 'text':entry}
-                    self.server.Entries[id] = entry_response
-                self.retransmit(request_path, "POST", id, json.dumps(entry_response))
-            else :
-                #I am not the leader
-                # pass along post to leader
-                self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry)
-            new_message()
+                entry_id = parameters['id'][0]
+                self.server.database.save_post(entry_id, entry, DATABASE_MODIFY, self.server.database.get_logical_clock(entry_id), tick, self.server.get_ip_address())
+                action = DATABASE_MODIFY
 
-        #  Cost of post delivered to all nodes:
-        #
-        #   Upon a post event to a vessel:
-        #   first retransmit to leader. (1)
-        #   (all messages contain only one entry i.e payload = 1)
-        #   then propagation from leader to all other vessels. (N-1)
-        #   Cost for post = N = number of vessels
+            retransmit_msg = {'id':entry_id, 'action':action, "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
+            self.retransmit(request_path, "POST", entry_id, json.dumps(retransmit_msg))
 
         elif request_path == "/propagate/board":
             new_message()
-            id = parameters['id'][0]
-            self.server.Entries[id] = json.loads(parameters['entry'][0])
+            content = json.loads(parameters['entry'][0])
+            id = content["id"]
+            entry = content["text"]
+            modified_by = content['pid']
+            logical_timestamp = content["logical_timestamp"]
+            action = content["action"]
+            incoming_vclock = content['vc']
             self.success_out()
+            self.server.update_clock(incoming_vclock)
+            self.server.database.save_post(id, entry, action, logical_timestamp, self.server.vclock[modified_by], modified_by)
 
-        elif request_path.startswith("/propagate/entries/"):
-            new_message()
-            id = self.path.replace("/propagate/entries/", "")
-            self.server.Entries[id] = parameters['entry'][0]
-            self.success_out()
 
-        elif request_path == ("/ELECTION"):
-            print "/ELECTION endpoint hit"
-            thread = Thread(target=self.election,args=([parameters["election_table"][0]]))
-            # We kill the process if we kill the server
-            thread.daemon = True
-            # We start the thread
-            thread.start()
 
     def success_out(self):
             self.set_HTTP_headers(200)
@@ -347,35 +382,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             # We start the thread
             thread.start()
 
-    def election(self, their_finger_table_string):
-            their_finger_table = json.loads(their_finger_table_string)
-            if server.identifier in their_finger_table.keys():
-                print ("Election over")
-                server.finger_table = their_finger_table
-                self.server.failedLeaders = 0
-                server.leaderRandomNumber = sorted(their_finger_table)[0]
-                server.leader = their_finger_table[sorted(their_finger_table)[0]]
-                print ("The leader is %s" % server.leader)
-                #when our own id is in the fingertable we can assume that the election has
-                # reached all nodes (e.g. gone full circle, one round)
-                # We then select the leader with the lowest key
-            else:
-                print ("Sending Vote")
-                their_finger_table[server.identifier] = server.get_ip_address()
-                server.contact_vessel_for_election(server.find_neighbour(), "/ELECTION", "POST", "election_table", json.dumps(their_finger_table))
-
 
 #------------------------------------------------------------------------------------------------------
-# POST Logic
-#------------------------------------------------------------------------------------------------------
-    # We might want some functions here as well
-#------------------------------------------------------------------------------------------------------
-
-
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
     def do_DELETE(self):
-        #new_message()
+        new_message()
         print("Receiving a DELETE on %s" % self.path)
         parameters = self.parse_POST_request()
         request_path = self.path
@@ -384,49 +396,43 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if 'id' not in keys:
                 self.error_out("missing id")
                 return
-            id = parameters['id'][0]
-            if id in self.server.Entries:
+            entry_id = parameters['id'][0]
+            if self.server.database.get_logical_clock(entry_id) > -1:
                 self.success_out()
-                if self.server.get_ip_address() == self.server.leader:
-                    #we are leader
-                    self.server.delete_value_in_store(id)
-                    self.retransmit(request_path, "DELETE", id, None)
-                else:
-                    #we are NOT leader
-                    self.server.contact_vessel(self.server.leader, "/board", "DELETE", id, None)
+                self.server.delete_value_in_store(entry_id)
+                self.retransmit(request_path, "DELETE", entry_id, None)
             else:
                 #return not found
                 self.error_out("Not found", 404)
+            
 
         elif request_path.startswith("/propagate/board"):
-            print ("Propagate!")
+            new_message()
             if 'id' not in keys:
                 self.error_out("missing id")
                 print ("Propagate!:NOKEY")
                 return
-            id = parameters['id'][0]
-            print ("Propagate!: ID %s" % id)
-            if id in self.server.Entries:
+            entry_id = parameters['id'][0]
+            print ("Propagate!: ID %s" % entry_id)
+            if self.server.database.get_logical_clock(entry_id) > -1:
                 # Delete
-                print ("Propagate!: ID FOUND %s")
-                self.server.delete_value_in_store(id)
+                print ("ID FOUND")
+                self.server.delete_value_in_store(entry_id)
                 self.success_out()
             else:
                 #return not found
                 print ("Propagate!: ID NOT FOUND")
                 self.error_out("Not found", 404)
 
-#---------------------------------------------------------------------------------
+
 # file i/o
 def read_file(filename):
     curr_path = sys.path[0]
-    opened_file = open('%s/%s' % (curr_path, filename), 'r')
-    all_content = ''
-    for line in opened_file:
-        all_content += line
-    opened_file.close()
-    return all_content
-#------------------------------------------------------------------------------------------------------
+    f = open('%s/%s' % (curr_path, filename))
+    content = f.read()
+    f.close()
+    return content
+
 
 def return_entry_timestamp(entry):
     if 'timestamp' not in entry:
@@ -439,8 +445,20 @@ if __name__ == '__main__':
     vessel_list = []
     vessel_id = 0
     # Checking the arguments
-    if len(sys.argv) != 3: # 2 args, the script and the vessel name
-        print("Arguments: vessel_ID number_of_vessels")
+    nr_args = len(sys.argv)
+    if nr_args < 3 or nr_args > 4: # 2 args, the script and the vessel name
+        print("Arguments: vessel_ID number_of_vessels [--debug]" )
+
+    elif len(sys.argv) == 4 and sys.argv[3] == "--debug":
+        # Set port as id instead of ip for running on localhost:
+        DEBUG = True
+        vessel_id = int(sys.argv[1])
+        for i in range(1, int(sys.argv[2])+1):
+            vessel_list.append(PORT_PREFIX + str(i))
+        # We launch a server
+        port_nr = int(PORT_PREFIX + str(vessel_id))
+        server = BlackboardServer((LOCALHOST, port_nr), BlackboardRequestHandler, vessel_id, vessel_list)
+        print("Starting DEBUG server on port: %s:%d" % (LOCALHOST, port_nr))
     else:
         # We need to know the vessel IP
         vessel_id = int(sys.argv[1])
@@ -448,17 +466,19 @@ if __name__ == '__main__':
         for i in range(1, int(sys.argv[2])+1):
             vessel_list.append(IP_ADDRESS_PREFIX + ("%d" % i)) # We can add ourselves, we have a test in the propagation
 
-    # We launch a server
-    server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
-    print("Starting the server on port: %d" % PORT_NUMBER)
+        # We launch a server
+        server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
+        print("Starting the server on port: %d" % PORT_NUMBER)
+
 
     # Printing all vessels
+    print "This Server: %s" % vessel_id
     print "All vessels:"
     for vessel in vessel_list:
-        if vessel.endswith(str(vessel_id)):
-            print "%s:%s <-- this server" % (vessel, PORT_NUMBER)
+        if DEBUG:
+            print "    %s:%s" % (LOCALHOST, vessel)
         else:
-            print "%s:%s" % (vessel, PORT_NUMBER)
+            print "    %s:%s" % (vessel, PORT_NUMBER)
 
     try:
         server.serve_forever()
