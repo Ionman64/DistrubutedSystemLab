@@ -100,6 +100,7 @@ class DatabaseHandler:
             conn.close()
 
     def save_post(self, id, entry, action, logical_timestamp=-1, sequence_number=0, modified_by = 0):
+        print ("MODIFIED BY %s" % modified_by)
         if self.post_deleted(id):
             return False
         if (logical_timestamp == -1):
