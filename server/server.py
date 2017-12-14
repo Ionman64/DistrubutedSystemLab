@@ -40,12 +40,14 @@ PORT_PREFIX = "6100"
 DEBUG_MODE = True
 
 #perf testing
+START_TIME = str(datetime.now())
+
 MESSAGE_COUNT = 200
 def new_message():
     global MESSAGE_COUNT
     MESSAGE_COUNT = MESSAGE_COUNT - 1
     if MESSAGE_COUNT == 0:
-        print ("TIME TO EVENTUAL CONSISTANCY: %s" % str(datetime.now()))
+        print ("TIME TO EVENTUAL CONSISTANCY: \n START: %s \n END: % s" % (START_TIME, str(datetime.now())))
 
 #------------------------------------------------------------------------------------------------------
 class DatabaseHandler:
