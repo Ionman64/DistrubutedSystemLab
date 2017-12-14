@@ -281,7 +281,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 # get from parameters (modified entry)
                 id = parameters['id'][0]
             entry_response = {}
-            new_message()
             self.success_out()
             if self.server.get_ip_address() == self.server.leader:
                 entry_response = {}
@@ -299,6 +298,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 #I am not the leader
                 # pass along post to leader
                 self.server.contact_vessel(self.server.leader, "/board", "POST", id, entry)
+            new_message()
 
         #  Cost of post delivered to all nodes:
         #
@@ -375,7 +375,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
     def do_DELETE(self):
-        new_message()
+        #new_message()
         print("Receiving a DELETE on %s" % self.path)
         parameters = self.parse_POST_request()
         request_path = self.path
