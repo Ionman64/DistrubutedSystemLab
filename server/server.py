@@ -218,6 +218,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.server.byzantine_votes[self.server.get_ip_address()] = False 
             self.success_out()
             vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
+            print (vote)
             i = 0
             for vessel in self.server.vessels:
                 self.server.contact_vessel(vessel, "/propagate/vote", "POST", self.server.get_ip_address(), vote[i])
