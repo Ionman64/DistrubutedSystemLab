@@ -221,6 +221,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print (vote)
             i = 0
             for vessel in self.server.vessels:
+                if vessel == self.server.get_ip_address():
+                    continue
                 self.server.contact_vessel(vessel, "/propagate/vote", "POST", self.server.get_ip_address(), vote[i])
                 i = i + 1
             
