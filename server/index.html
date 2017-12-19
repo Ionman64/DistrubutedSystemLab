@@ -26,21 +26,11 @@ function el(m) {
 }
 function load_board_ajax() {
 	$.ajax({
-		url:"/board",
+		url:"/",
 		method:"GET",
 		dataType:"JSON",
 		crossOrigin:true,
 		success:function(data, status) {
-			/*<div id="boardcontents_placeholder">
-				<!-- The title comes here -->
-				<div id="boardtitle_placeholder" class="boardtitle">%s</div>
-				<input type="text" name="id" value="ID" readonly>
-				<input type="text" name="entry" value="Entry" size="70%%" readonly>
-				<!-- The entries come here -->
-				%s
-			</div>*/
-			$("#board-contents").empty();
-			$.each(data, function(key, item) {
 				console.log("item:" + item);
 				var board_entry = el("section");
 				board_entry.id = "boardcontents_placeholder";
@@ -48,96 +38,46 @@ function load_board_ajax() {
 				boardtitle.id = "boardtitle_placeholder";
 				boardtitle.className = "boardtitle";
 				board_entry.appendChild(boardtitle);
-				var input = el("input");
-				input.type = "number";
-				input.name = "order";
-				input.value = item.seq;
-				input.readonly = true;
-				board_entry.appendChild(input);
-				var input = el("input");
-				input.type = "text";
-				input.name = "modified_by";
-				input.value = item.modified_by;
-				input.readonly = true;
-				board_entry.appendChild(input);
-				var input = el("input");
-				input.type = "text";
-				input.name = "id";
-				input.value = item.id;
-				input.readonly = true;
-				board_entry.appendChild(input);
-				var input = el("input");
-				input.type = "text";
-				input.name = "entry";
-				input.value = item.text;
-				input.setAttribute("data-id", item.id);
-				input.style.size = "70%";
 				board_entry.appendChild(input);
 				var button = el("button");
-				button.innerHTML = "modify";
-				button.className = "modify";
-				button.setAttribute("data-id", item.id);
+				button.innerHTML = "attack";
+				button.className = "attack";
 				board_entry.appendChild(button);
 				var button = el("button");
-				button.innerHTML = "delete";
-				button.className = "delete";
-				button.setAttribute("data-id", item.id);
+				button.innerHTML = "retreat";
+				button.className = "retreat";
+				board_entry.appendChild(button);
+				var button = el("button");
+				button.innerHTML = "byzantine";
+				button.className = "byzantine";
 				board_entry.appendChild(button);
 				$("#board-contents").append(board_entry);
-			});
 		},
 		complete:function() {
 			console.log("updated board");
 		}
 	});
 }
-function add_entry_ajax() {
+function attack_ajax(id) {
 	$.ajax({
-		url:"/board",
+		url:"/vote/attack",
 		method:"POST",
-		dataType:"JSON",
-		crossOrigin:true,
-		data: {"entry":$("#entry").val()},
-		sucess:function(data, status) {
-			page_reload_count++;
-			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
-		},
-		complete: function() {
-			console.log("added new entry to contents");
-		}
-	});
-	return false;
-}
-function modify_ajax(id) {
-	$.ajax({
-		url:"/board",
-		method:"POST",
-		dataType:"JSON",
-		crossOrigin:true,
-		data: {"id":id,"entry":$("input[data-id='" + id + "']").val()},
-		sucess:function(data, status) {
-			page_reload_count++;
-			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
-		},
-		complete: function() {
-			console.log("added new entry to contents");
-		}
+		crossOrigin:true
 	});
 }
-function delete_ajax(id) {
+function retreat_ajax(id) {
 	$.ajax({
-		url:"/board",
-		method:"DELETE",
-		dataType:"JSON",
-		data:{"id":id},
-		crossOrigin:true,
-		sucess:function(data, status) {
-			page_reload_count++;
-			$("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
-		},
-		complete: function() {
-			console.log("added new entry to contents");
-		}
+		url:"/vote/retreat",
+		method:"POST",
+ 		crossOrigin:true
+	});
+}
+
+function byzantine_ajax(id) {
+	$.ajax({
+		url:"/vote/byzantine",
+		method:"POST",
+ 		crossOrigin:true
 	});
 }
 function reload_countdown(remaining) {
@@ -153,11 +93,14 @@ function reload_countdown(remaining) {
 
 $(document).ready(function() {
     reload_countdown(page_reload_timeout);
-    $("#board-contents").on("click", ".modify", function() {
-    	modify_ajax($(this).attr("data-id"));
+    $("#board-contents").on("click", ".attack", function() {
+    	attack_ajax($(this);
     });
-    $("#board-contents").on("click", ".delete", function() {
-    	delete_ajax($(this).attr("data-id"));
+    $("#board-contents").on("click", ".retreat", function() {
+    	retreat_ajax($(this));
+    });
+		$("#board-contents").on("click", ".byzantine", function() {
+    	byzantine_ajax($(this));
     });
 });
 </script>
