@@ -43,7 +43,6 @@ class BlackboardServer(HTTPServer):
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
         self.byzantine_votes = {}
-        self.vector_votes = {}
         self.isByzantineNode = False
 
     def tick(self):
@@ -215,13 +214,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/vote/attack":
             print "I am voting to attack"
             self.server.byzantine_votes[self.server.get_ip_address()] = True
-            self.retransmit(request_path, "POST", self.server.get_ip_address(), "True")
+            self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
             self.success_out()
             return
         if request_path == "/vote/retreat":
             print "I am voting to retreat"
             self.server.byzantine_votes[self.server.get_ip_address()] = False
-            self.retransmit(request_path, "POST", self.server.get_ip_address(), "False")
+            self.retransmit("/vote", "POST", self.server.get_ip_address(), "False")
             self.success_out()
             return
         if request_path == "/vote/byzantine":
@@ -229,18 +228,34 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             self.server.isByzantineNode = True
             if len(self.server.byzantine_votes) == len(self.server.vessels)-1:
                 vote = self.compute_byzantine_vote_round1(3, True)
-                if (vote == True):
-                    self.retransmit(request_path, "POST", self.server.get_ip_address(), "True")
-                else:
-                    self.retransmit(request_path, "POST", self.server.get_ip_address(), "False")
+
+                #if (vote == True):
+                #    self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
+                #else:
+                #    self.retransmit("/vote", "POST", self.server.get_ip_address(), "False")
             self.success_out()
             return
 
-        if request_path == "/propagate/vote/":
+        if request_path == "/propagate/vote":
             id_sender = parameters['id'][0]
-            votes_vector = parameter['entry'][0]
-        
-            self.server.vector_votes[id_sender] = parameter[vector_votes]
+            value = parameters['entry'][0]
+            if value == 'True' or value == 'False':
+                # its a vote
+                print "Receiving vote"
+                if value == 'True':
+                    self.server.byzantine_votes[id_sender] = True
+                if value == 'False':
+                    self.server.byzantine_votes[id_sender] = False
+            else:
+                # its a dict
+                "Receiving vote array"
+                self.server.byzantine_votes[id_sender] = json.loads(value)
+
+            print "byz_votes: %s" % self.server.byzantine_votes
+
+    def has_all_votes(self):
+         return len(self.server.byzantine_votes) == len(self.server.vessels)
+
 
     def success_out(self):
             self.set_HTTP_headers(200)
@@ -266,7 +281,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 # Request handling - DELETE
 #------------------------------------------------------------------------------------------------------
     def do_DELETE(self):
-        new_message()
         print("Receiving a DELETE on %s" % self.path)
         parameters = self.parse_POST_request()
         request_path = self.path
@@ -286,7 +300,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
 
         elif request_path.startswith("/propagate/board"):
-            new_message()
             if 'id' not in keys:
                 self.error_out("missing id")
                 print ("Propagate!:NOKEY")
