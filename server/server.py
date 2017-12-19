@@ -215,6 +215,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/vote/byzantine":
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
+            self.server.byzantine_votes[self.server.get_ip_address()] = False 
             self.success_out()
             vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
             print (vote)
@@ -321,8 +322,8 @@ def evaluate_votes(vessels, vector):
     #nodes = [1,2,3,4] 
     #this should be the vessel list
     for node in vessels:
-        #if node == server.get_ip_address():
-        #continue
+        if node == server.get_ip_address():
+            continue
         for index in range(len(vessels)):
             count_true = count_by_index(vector, node, True)
             count_false = count_by_index(vector, node, False)
