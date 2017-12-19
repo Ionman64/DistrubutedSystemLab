@@ -319,7 +319,7 @@ def evaluate_votes(vessels, vector):
     for node in vessels:
         if node == server.get_ip_address():
             continue
-        for index in range(len(nodes)):
+        for index in range(len(vessels)):
             count_true = count_by_index(vector, node, True)
             count_false = count_by_index(vector, node, False)
             if (count_true > count_false):
