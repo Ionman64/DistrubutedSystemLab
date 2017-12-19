@@ -252,7 +252,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         #    vote = self.compute_byzantine_vote_round1(3, True)
         #else:
 
-
     def has_all_votes(self):
          return len(self.server.byzantine_votes) == len(self.server.vessels)
 
@@ -311,8 +310,21 @@ def return_entry_timestamp(entry):
         return 0
     return entry['timestamp']
 
+def evaluate_votes(vector):
+    result_vector = []
+    list_of_nodes = vector.keys()
+    return ["Fasdfasdf"]
+
 # Execute the code
 if __name__ == '__main__':
+    #TEST
+
+    testvector = {1: {1: True, 2: False, 3: True, 4: True},
+       2: {1: True, 2: False, 3: True, 4: False},
+       3: {1: True, 2: False, 3: True, 4: True},
+       4: {1: True, 2: False, 3: True, 4: False}}
+    print "result: %s" % evaluate_votes(testvector)
+
     index = read_file("index.html");
     vessel_list = []
     vessel_id = 0
