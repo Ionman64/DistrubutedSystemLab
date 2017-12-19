@@ -215,7 +215,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/vote/byzantine":
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
-            self.server.byzantine_votes[self.server.get_ip_address()] = False 
             self.success_out()
             vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
             print (vote)
