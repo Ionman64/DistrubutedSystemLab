@@ -201,14 +201,16 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/vote/attack":
             print "I am voting to attack"
             self.server.byzantine_votes[self.server.get_ip_address()] = True
-            self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
             self.success_out()
+            self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
+            
 
         if request_path == "/vote/retreat":
             print "I am voting to retreat"
             self.server.byzantine_votes[self.server.get_ip_address()] = False
-            self.retransmit("/vote", "POST", self.server.get_ip_address(), "False")
             self.success_out()
+            self.retransmit("/vote", "POST", self.server.get_ip_address(), "False")
+            
 
         if request_path == "/vote/byzantine":
             print "I am voting to byzantine"
