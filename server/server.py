@@ -251,7 +251,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             if self.server.isByzantineNode:
                 self.server.result_vector = self.compute_byzantine_vote_round2(len(self.server.vessels)-TRAITORS,len(self.server.vessels)+1,TIE_BREAKER)
             else:
-                self.server.result_vector = evaluate_votes(self.server.vessels, vector)
+                self.server.result_vector = evaluate_votes(self.server.vessels, self.server.vector_byzantine_votes)
 
     def has_all_votes(self):
          return len(self.server.byzantine_votes) == len(self.server.vessels)
