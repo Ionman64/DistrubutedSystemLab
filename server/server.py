@@ -165,7 +165,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
         self.wfile.write(index)
 
-    def compute_byzantine_vote_round1(no_loyal, on_tie):
+    def compute_byzantine_vote_round1(self, no_loyal, on_tie):
         result_vote = []
         for i in range(0,no_loyal):
             if i%2==0:
@@ -174,7 +174,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 result_vote.append(on_tie)
         return result_vote
 
-    def compute_byzantine_vote_round2(no_loyal,no_total,on_tie):
+    def compute_byzantine_vote_round2(self, no_loyal,no_total,on_tie):
         result_vectors=[]
         for i in range(0,no_loyal):
             if i%2==0:
@@ -212,7 +212,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
             if len(self.server.byzantine_votes) == len(self.server.vessels)-1:
-                vote = self.compute_byzantine_vote_round1(3, True)
+                vote = self.compute_byzantine_vote_round1(3, TIE_BREAKER)
 
                 #if (vote == True):
                 #    self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
