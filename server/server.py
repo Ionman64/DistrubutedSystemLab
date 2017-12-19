@@ -262,9 +262,9 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
 
         if request_path == "/propagate/vote/attack":
-            
+            pass
         if request_path == "/propagate/vote/retreat":
-            
+            pass
         elif request_path == "/propagate/board":
             new_message()
             content = json.loads(parameters['entry'][0])

@@ -32,27 +32,15 @@ function load_board_ajax() {
 		dataType:"JSON",
 		crossOrigin:true,
 		success:function(data, status) {
-				console.log("item:" + item);
-				var board_entry = el("section");
-				board_entry.id = "boardcontents_placeholder";
-				var boardtitle = el("section");
-				boardtitle.id = "boardtitle_placeholder";
-				boardtitle.className = "boardtitle";
-				board_entry.appendChild(boardtitle);
-				board_entry.appendChild(input);
-				var button = el("button");
-				button.innerHTML = "attack";
-				button.className = "attack";
-				board_entry.appendChild(button);
-				var button = el("button");
-				button.innerHTML = "retreat";
-				button.className = "retreat";
-				board_entry.appendChild(button);
-				var button = el("button");
-				button.innerHTML = "byzantine";
-				button.className = "byzantine";
-				board_entry.appendChild(button);
-				$("#board-contents").append(board_entry);
+			$("#vote_result_placeholder").empty();
+			$.each(data, function(key, value) {
+				var span = document.createElement("span");
+				span.innerHTML = key + " : " + (value ? "Attack" : "Retreat");
+				span.className = "bold " + (value ? "attack" : "retreat");
+				$("#vote_result_placeholder").append(span);
+				$("#vote_result_placeholder").append(text);
+				$("#vote_result_placeholder").append("<br>");
+			});
 		},
 		complete:function() {
 			console.log("updated board");
@@ -162,6 +150,15 @@ footer {
 #boardtitle_placeholder {
     font-size: 125%;
     font-weight: bold;
+}
+.bold {
+	font-weight:bold;
+}
+.attack {
+	color:green;
+}
+.retreat {
+	color:red;
 }
 </style>
 </head>
