@@ -214,7 +214,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
             self.success_out()
-            if has_all_votes():
+            if self.has_all_votes():
                 vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
                 i = 0
                 for vessel in self.server.vessels:
