@@ -40,23 +40,11 @@ class BlackboardServer(HTTPServer):
         self.vessel_id = node_id
         # The list of other vessels
         self.vessels = vessel_list
-        # Create vector clock and initalize all to 0
-        self.vclock = dict.fromkeys(self.vessels, 0)
+
         self.byzantine_votes = {}
         self.vector_byzantine_votes = {}
         self.isByzantineNode = False
         self.round = 0
-
-    def tick(self):
-        this_vessel = self.get_ip_address()
-        self.vclock[this_vessel] = self.vclock[this_vessel] + 1
-        return self.vclock[this_vessel]
-
-
-    def update_clock(self, other_clock):
-        self.tick()
-        for k, v in other_clock.items():
-            self.vclock[k] = max(self.vclock[k], v) # choose highest value
 
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
@@ -160,8 +148,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         #print("Receiving a GET on path %s" % self.path)
 
         # Here, we should check which path was requested and call the right logic based on it
-        if self.path == "/board":
-            self.do_GET_Board()
         if self.path == "/vote/result":
             self.set_HTTP_headers(200)
             self.wfile.write(json.dumps(self.server.byzantine_votes))
@@ -172,11 +158,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
 #------------------------------------------------------------------------------------------------------
 # GET logic - specific path
-#------------------------------------------------------------------------------------------------------
-
-    def do_GET_Board(self):
-        self.set_HTTP_headers(200)
-        self.wfile.write(json.dumps(self.server.database.get_posts()))
+#----------------------------------------------------------------------------------------------------
 
     def do_GET_Index(self):
         #output index.html
@@ -213,16 +195,19 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         print("Receiving a POST on %s" % self.path)
         print "parameters: %s" % parameters
         self.set_HTTP_headers(200)
+
         if request_path == "/vote/attack":
             print "I am voting to attack"
             self.server.byzantine_votes[self.server.get_ip_address()] = True
             self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
             self.success_out()
+
         if request_path == "/vote/retreat":
             print "I am voting to retreat"
             self.server.byzantine_votes[self.server.get_ip_address()] = False
             self.retransmit("/vote", "POST", self.server.get_ip_address(), "False")
             self.success_out()
+
         if request_path == "/vote/byzantine":
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
@@ -249,23 +234,24 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                 # its a dict
                 "Receiving vote array"
                 self.server.vector_byzantine_votes[id_sender] = json.loads(value)
-        
+
         if self.isRoundOne() and self.server.round == 0:
             print "It's Round One"
             print "byz_votes: %s" % self.server.byzantine_votes
             self.server.vector_byzantine_votes[self.server.get_ip_address()] = self.server.byzantine_votes
             self.retransmit("/vote", "POST", self.server.get_ip_address(), json.dumps(self.server.byzantine_votes))
             self.server.round = 1
+
         if self.isRoundTwo() and self.server.round == 1:
             print "It's Round Two"
             print "byz_votes: %s" % self.server.vector_byzantine_votes
             self.server.round = 2
             #decide on plan
-            
+
         #if self.server.isByzantineNode:
-        #    vote = self.compute_byzantine_vote_round1(3, True) 
+        #    vote = self.compute_byzantine_vote_round1(3, True)
         #else:
-            
+
 
     def has_all_votes(self):
          return len(self.server.byzantine_votes) == len(self.server.vessels)
@@ -275,7 +261,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def isRoundOne(self):
         if not self.has_all_votes():
-           return False 
+           return False
         success = True
         for key in self.server.byzantine_votes:
             if type(self.server.byzantine_votes[key]) != type(True):
@@ -284,13 +270,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
 
     def isRoundTwo(self):
         if not self.has_all_vector_votes():
-               return False 
+               return False
         success = True
         for key in self.server.vector_byzantine_votes:
             if type(self.server.vector_byzantine_votes[key]) != type({}):
                 success = False
         return success
-                
+
 
     def success_out(self):
             self.set_HTTP_headers(200)
@@ -310,47 +296,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             thread.daemon = True
             # We start the thread
             thread.start()
-
-
-#------------------------------------------------------------------------------------------------------
-# Request handling - DELETE
-#------------------------------------------------------------------------------------------------------
-    def do_DELETE(self):
-        print("Receiving a DELETE on %s" % self.path)
-        parameters = self.parse_POST_request()
-        request_path = self.path
-        keys = parameters.keys()
-        if request_path.startswith("/board"):
-            if 'id' not in keys:
-                self.error_out("missing id")
-                return
-            entry_id = parameters['id'][0]
-            if self.server.database.get_logical_clock(entry_id) > -1:
-                self.success_out()
-                self.server.delete_value_in_store(entry_id)
-                self.retransmit(request_path, "DELETE", entry_id, None)
-            else:
-                #return not found
-                self.error_out("Not found", 404)
-
-
-        elif request_path.startswith("/propagate/board"):
-            if 'id' not in keys:
-                self.error_out("missing id")
-                print ("Propagate!:NOKEY")
-                return
-            entry_id = parameters['id'][0]
-            print ("Propagate!: ID %s" % entry_id)
-            if self.server.database.get_logical_clock(entry_id) > -1:
-                # Delete
-                print ("ID FOUND")
-                self.server.delete_value_in_store(entry_id)
-                self.success_out()
-            else:
-                #return not found
-                print ("Propagate!: ID NOT FOUND")
-                self.error_out("Not found", 404)
-
 
 # file i/o
 def read_file(filename):
