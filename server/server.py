@@ -46,6 +46,7 @@ class BlackboardServer(HTTPServer):
         self.vector_byzantine_votes = {}
         self.isByzantineNode = False
         self.round = 0
+        self.result_vector = {}
 
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
@@ -151,7 +152,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # Here, we should check which path was requested and call the right logic based on it
         if self.path == "/vote/result":
             self.set_HTTP_headers(200)
-            self.wfile.write(json.dumps(self.server.byzantine_votes))
+            self.wfile.write(json.dumps(self.server.result_vector))
             self.finish()
             #self.success_out()
         else:
@@ -213,8 +214,8 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
             self.success_out()
-            if len(self.server.byzantine_votes) == len(self.server.vessels)-1:
-                vote = self.compute_byzantine_vote_round1(len(self.server.vessels-TRAITORS, TIE_BREAKER))
+            if has_all_votes():
+                vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
                 i = 0
                 for vessel in self.server.vessels:
                     self.server.contact_vessel(vessel, "/propagate/vote", "POST", self.server.get_ip_address(), vote[i])
@@ -247,20 +248,10 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "It's Round Two"
             print "byz_votes: %s" % self.server.vector_byzantine_votes
             self.server.round = 2
-            result_vector = evaluate_votes(self.server.vessels, vector)
-            count_true = count(result_vector, True)
-            count_false = count(result_vector, False)
-            if count_true > count_false:
-                self.wfile.write(json.dumps({"status":"ok", "result":True}))
-            elif count_true < count_false:
-                self.wfile.write(json.dumps({"status":"ok", "result":False}))
+            if self.server.isByzantineNode:
+                self.server.result_vector = self.compute_byzantine_vote_round2(len(self.server.vessels)-TRAITORS,len(self.server.vessels)+1,TIE_BREAKER)
             else:
-                self.wfile.write(json.dumps({"status":"ok", "result":TIE_BREAKER}))
-            #decide on plan
-
-        #if self.server.isByzantineNode:
-        #    vote = self.compute_byzantine_vote_round1(3, True)
-        #else:
+                self.server.result_vector = evaluate_votes(self.server.vessels, vector)
 
     def has_all_votes(self):
          return len(self.server.byzantine_votes) == len(self.server.vessels)
