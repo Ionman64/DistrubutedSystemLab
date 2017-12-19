@@ -34,11 +34,11 @@ function load_board_ajax() {
 		success:function(data, status) {
 			$("#vote_result_placeholder").empty();
 			$.each(data, function(key, value) {
+				console.log(value);
 				var span = document.createElement("span");
 				span.innerHTML = key + " : " + (value ? "Attack" : "Retreat");
 				span.className = "bold " + (value ? "attack" : "retreat");
 				$("#vote_result_placeholder").append(span);
-				$("#vote_result_placeholder").append(text);
 				$("#vote_result_placeholder").append("<br>");
 			});
 		},
@@ -100,7 +100,7 @@ $(document).ready(function() {
 	$("#retreat-button").click(function() {
 		retreat_ajax();
 	});
-	$("#byzantine-button").click(function() {
+	$("#byzantine-button").click(function() {http://127.0.0.1:61001/
 		byzantine_ajax();
 	});
 	$("#results-button").click(function() {
