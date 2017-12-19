@@ -21,17 +21,9 @@ import os
 from collections import OrderedDict
 from datetime import datetime
 
-
-#------------------------------------------------------------------------------------------------------
 # Static variables definitions
 IP_ADDRESS_PREFIX = "10.1.0."
 PORT_NUMBER = 61001
-
-#For the database
-DATABASE_CREATE = 0
-DATABASE_MODIFY = 1
-DATABASE_DELETE = 2
-DATABASE_BUFFERED = 1
 
 # debug variables
 DEBUG = False
@@ -39,129 +31,15 @@ LOCALHOST = "127.0.0.1"
 PORT_PREFIX = "6100"
 DEBUG_MODE = True
 
-#perf testing
-START_TIME = str(datetime.now())
-
-NUMBER_OF_NODES = 8
-NUMBER_OF_MESSAGES = 50
-MESSAGE_COUNT = NUMBER_OF_MESSAGES * NUMBER_OF_NODES
-def new_message():
-    global MESSAGE_COUNT
-    MESSAGE_COUNT = MESSAGE_COUNT - 1
-    if MESSAGE_COUNT == 0:
-        print ("TIME TO EVENTUAL CONSISTANCY: \n START: %s \n END: % s" % (START_TIME, str(datetime.now())))
-
-#------------------------------------------------------------------------------------------------------
-class DatabaseHandler:
-    def __init__(self, name):
-        self.database = (str(name) + ".sqlite")
-        if DEBUG_MODE:
-            print ("*************WARNING: DEBUG MODE ACTIVE**************")
-            if (os.path.exists(self.database)):
-                os.remove(self.database)
-                print ("DATABASE DELETED")
-        if not os.path.exists(self.database):
-            conn = self.get_connection()
-            cur = conn.cursor()
-            print ("CREATED DATABASE")
-            cur.execute("CREATE TABLE posts (id VARCHAR(36), entry VARCHAR(1000), action INT, logical_timestamp INT, sequence_number INT, modified_by VARCHAR(16), unique(id, logical_timestamp))")
-            print ("CREATED TABLES")
-
-    def get_connection(self):
-        try:
-            return sqlite3.connect(self.database)
-        except Exception as ex:
-            raise Exception(ex)
-
-    def get_posts(self):
-        conn = self.get_connection()
-        cur = conn.cursor()
-        get_all_except_deleted_query = "SELECT id, entry, sequence_number, modified_by FROM posts GROUP BY id HAVING action != 2 ORDER BY sequence_number, modified_by"
-        cur = cur.execute(get_all_except_deleted_query)
-        entries = OrderedDict()
-        for row in cur.fetchall():
-            entries[row[0]] = {"id":row[0], "text":row[1], "seq":row[2], "modified_by": row[3]}
-        return entries
-
-    def post_deleted(self, id):
-        conn = self.get_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT 1 FROM posts WHERE id = ? AND action = ?", (id, DATABASE_DELETE))
-            if cur.rowcount > 0:
-                return True
-            return False
-        except Exception as ex:
-            print(ex)
-            return False
-        finally:
-            conn.close()
-
-    def get_logical_clock(self, id):
-        conn = self.get_connection()
-        cur = conn.cursor()
-        try:
-            cur = conn.execute("SELECT IFNULL(MAX(logical_timestamp), -1) FROM posts WHERE id = ?", [id])
-            if (cur.rowcount > 0):
-                return -1
-            for row in cur.fetchone():
-                return int(row)
-        except Exception as ex:
-            raise ex
-            print(ex)
-            return None
-        finally:
-            conn.close()
-
-    def save_post(self, id, entry, action, logical_timestamp=-1, sequence_number=0, modified_by = 0):
-        print ("MODIFIED BY %s" % modified_by)
-        if self.post_deleted(id):
-            return False
-        if (logical_timestamp == -1):
-            logical_timestamp = self.get_logical_clock(id)
-        if (logical_timestamp == None):
-            raise Exception("Could not get logical timestamp")
-            return
-        logical_timestamp += 1
-        if (action < 0 or action > 2):
-            print ("Illegal action")
-            return
-        conn = self.get_connection()
-        cur = conn.cursor()
-        try:
-
-            if action == DATABASE_MODIFY:
-                # keep the same seq_number if entry is modified
-                cur.execute('SELECT sequence_number FROM posts WHERE id=?', (id,))
-                sequence_number = cur.fetchone()[0]
-
-            cur.execute("INSERT INTO posts (id, entry, action, logical_timestamp, sequence_number, modified_by) VALUES (?, ?, ?, ?, ?, ?)",(id, entry, action, logical_timestamp, sequence_number, modified_by))
-            conn.commit()
-            if cur.rowcount > 0:
-                #self.fix_buffer_for_entry(id)
-                return True
-            return False
-        except Exception as ex:
-            print (ex)
-            return False
-        finally:
-            conn.close()
-
-    def delete_post(self, id, logical_timestamp=-1, sequence_number=0):
-        self.save_post(id, "", DATABASE_DELETE, logical_timestamp, )
-
 class BlackboardServer(HTTPServer):
 
     def __init__(self, server_address, handler, node_id, vessel_list):
     # We call the super init
         HTTPServer.__init__(self,server_address, handler)
-        # we create the dictionary of values
-        self.Entries = {}
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
         # The list of other vessels
         self.vessels = vessel_list
-        self.database = DatabaseHandler(node_id)
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
 
@@ -176,21 +54,10 @@ class BlackboardServer(HTTPServer):
         for k, v in other_clock.items():
             self.vclock[k] = max(self.vclock[k], v) # choose highest value
 
-
-    def print_vclock(self):
-        for k, v in self.vclock.items():
-            print (k, v)
-
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
         self.socket.close()
         HTTPServer.shutdown(self)
-
-
-    # We delete a value received from the store
-    def delete_value_in_store(self,key):
-        # we delete a value in the store if it exists
-        self.database.delete_post(key, self.database.get_logical_clock(key), self.vclock[self.get_ip_address()])
 
 
     def get_ip_address(self):
@@ -404,7 +271,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             else:
                 #return not found
                 self.error_out("Not found", 404)
-            
+
 
         elif request_path.startswith("/propagate/board"):
             new_message()
