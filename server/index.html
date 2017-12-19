@@ -5,6 +5,7 @@
 <meta name="description" content="Blackboard for distributed systems course"/>
 <meta name="keywords" content="Lab"/>
 <meta name="author" content="Beshr Al Nahas"/>
+<title>Byzantine Agreement - TDA596 (Chalmers)</title>
 <!-- Important for the browser to show the page in the correct encoding -->
 <meta charset="UTF-8"/>
 <!-- Important for the browser to include the jQuery library. It is used to update the page contents automatically. -->
@@ -26,7 +27,7 @@ function el(m) {
 }
 function load_board_ajax() {
 	$.ajax({
-		url:"/",
+		url:"/vote/result",
 		method:"GET",
 		dataType:"JSON",
 		crossOrigin:true,
@@ -58,14 +59,14 @@ function load_board_ajax() {
 		}
 	});
 }
-function attack_ajax(id) {
+function attack_ajax() {
 	$.ajax({
 		url:"/vote/attack",
 		method:"POST",
 		crossOrigin:true
 	});
 }
-function retreat_ajax(id) {
+function retreat_ajax() {
 	$.ajax({
 		url:"/vote/retreat",
 		method:"POST",
@@ -73,7 +74,7 @@ function retreat_ajax(id) {
 	});
 }
 
-function byzantine_ajax(id) {
+function byzantine_ajax() {
 	$.ajax({
 		url:"/vote/byzantine",
 		method:"POST",
@@ -92,9 +93,9 @@ function reload_countdown(remaining) {
 }
 
 $(document).ready(function() {
-    reload_countdown(page_reload_timeout);
+    //reload_countdown(page_reload_timeout);
     $("#board-contents").on("click", ".attack", function() {
-    	attack_ajax($(this);
+    	attack_ajax($(this));
     });
     $("#board-contents").on("click", ".retreat", function() {
     	retreat_ajax($(this));
@@ -102,6 +103,18 @@ $(document).ready(function() {
 		$("#board-contents").on("click", ".byzantine", function() {
     	byzantine_ajax($(this));
     });
+	$("#attack-button").click(function() {
+		attack_ajax();
+	});
+	$("#retreat-button").click(function() {
+		retreat_ajax();
+	});
+	$("#byzantine-button").click(function() {
+		byzantine_ajax();
+	});
+	$("#results-button").click(function() {
+		load_board_ajax();
+	});
 });
 </script>
 <!-- this place defines the style (format) for different elements of the page -->
@@ -151,29 +164,54 @@ footer {
     font-weight: bold;
 }
 </style>
-    <title>Distributed board - TDA596 (Chalmers)</title>
 </head>
 	<body>
+		<section style="display:none">
+			<!-- this place will show a count down for the automatic reload of the board contents, downloaded periodically from the server using the javascript function reload_countdown. -->
+			<section id="countdown_placeholder"></section>
+			<!-- this place will show the actual contents of the blackboard.
+			It will be reloaded automatically from the server -->
+			<!-- This place shows the status of the auto-reload.
+			An error shown here means the server is not responding -->
+			<section id="boardcontents_status_placeholder">0: success</section>
+
+			<!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->
+			<section id="board_form_placeholder">
+				<h3>Submit to board</h3>
+				<form onsubmit="add_entry_ajax();return false;" method="post" target="noreload-form-target">
+					<input type="text" id="entry" name="entry" style="width:70%"/>
+					<input type="submit" value="Submit to board2"/>
+				</form>
+			</section>
+			<!-- The board contents come here -->
+			<section id="board-contents">
+
+			</section>
+		</section>
 		<!-- this place will show a count down for the automatic reload of the board contents, downloaded periodically from the server using the javascript function reload_countdown. -->
-		<section id="countdown_placeholder"></section>
-		<!-- this place will show the actual contents of the blackboard.
-		It will be reloaded automatically from the server -->
-		<!-- This place shows the status of the auto-reload.
-		An error shown here means the server is not responding -->
-		<section id="boardcontents_status_placeholder">0: success</section>
+		<div id="countdown_placeholder"></div>
+		<!-- This place shows the status of the auto-reload. 
+	An error shown here means the server is not responding -->
+		<div id="boardcontents_status_placeholder">0: success</div>
 
-		<!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->
-		<section id="board_form_placeholder">
-		    <h3>Submit to board</h3>
-		    <form onsubmit="add_entry_ajax();return false;" method="post" id="usrform" target="noreload-form-target">
-		        <input type="text" id="entry" name="entry" style="width:70%"/>
-		        <input type="submit" value="Submit to board2"/>
-		    </form>
-		</section>
-    	<!-- The board contents come here -->
-		<section id="board-contents">
+		<!-- This is a target for forms to prevent reloading the page on form submit. USE style="display:none" to hide it -->
+		<iframe name="noreload-form-target" width="90%" height="50" src="about:blank" frameborder="0" scrolling="yes" resizable seamless></iframe>
 
-		</section>
+		<!-- This place shows the buttons used to request a vote -->
+		<div id="vote_form_placeholder">
+		<h3>Vote</h3>
+			<button id="attack-button">Attack</button>
+			<button id="retreat-button">Retreat</button>
+			<button id="byzantine-button">Byzantine</button>
+		</div>
+
+		<h3>Result</h3>
+		<button id="results-button">Refresh Vote Result</button>
+
+		<div id="vote_result_placeholder">
+		<pre>Voting Results ...</pre>
+		</div>
+		
 		<footer>
 		  <p>Group members: Henrik Nume & Peter Pickerill</p>
 		</footer>

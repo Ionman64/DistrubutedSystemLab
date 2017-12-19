@@ -42,6 +42,8 @@ class BlackboardServer(HTTPServer):
         self.vessels = vessel_list
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
+        self.byzantine_votes = {}
+        self.isByzantineNode = False
 
     def tick(self):
         this_vessel = self.get_ip_address()
@@ -158,8 +160,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # Here, we should check which path was requested and call the right logic based on it
         if self.path == "/board":
             self.do_GET_Board()
-
-        # Default?
+        if self.path == "/vote/result":
+            self.set_HTTP_headers(200)
+            self.wfile.write(json.dumps(self.server.byzantine_votes))
+            self.finish()
+            #self.success_out()
         else:
             self.do_GET_Index()
 
@@ -176,6 +181,23 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
         self.wfile.write(index)
 
+    def compute_byzantine_vote_round1(no_loyal, on_tie):
+        result_vote = []
+        for i in range(0,no_loyal):
+            if i%2==0:
+                result_vote.append(not on_tie)
+            else:
+                result_vote.append(on_tie)
+        return result_vote
+
+    def compute_byzantine_vote_round2(no_loyal,no_total,on_tie):
+        result_vectors=[]
+        for i in range(0,no_loyal):
+            if i%2==0:
+                result_vectors.append([on_tie]*no_total)
+            else:
+                result_vectors.append([not on_tie]*no_total)
+        return result_vectors
 
 #------------------------------------------------------------------------------------------------------
 # Request handling - POST
@@ -189,6 +211,29 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         print("Receiving a POST on %s" % self.path)
         print "parameters: %s" % parameters
         self.set_HTTP_headers(200)
+        if request_path == "/vote/attack":
+            print "I am voting to attack"
+            self.server.byzantine_votes[self.server.get_ip_address()] = True
+            self.retransmit(request_path, "POST", self.server.get_ip_address(), "True")
+            self.success_out()
+            return
+        if request_path == "/vote/retreat":
+            print "I am voting to retreat"
+            self.server.byzantine_votes[self.server.get_ip_address()] = False
+            self.retransmit(request_path, "POST", self.server.get_ip_address(), "False")
+            self.success_out()
+            return
+        if request_path == "/vote/byzantine":
+            print "I am voting to byzantine"
+            self.server.isByzantineNode = True
+            if len(self.server.byzantine_votes) == len(self.server.vessels)-1:
+                vote = self.compute_byzantine_vote_round1(3, True)
+                if (vote == True):
+                    self.retransmit(request_path, "POST", self.server.get_ip_address(), "True")
+                else:
+                    self.retransmit(request_path, "POST", self.server.get_ip_address(), "False")
+            self.success_out()
+            return
         if request_path == "/board":
             keys = parameters.keys()
             entry_id = None
@@ -215,6 +260,11 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             retransmit_msg = {'id':entry_id, 'action':action, "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
             self.retransmit(request_path, "POST", entry_id, json.dumps(retransmit_msg))
 
+
+        if request_path == "/propagate/vote/attack":
+            
+        if request_path == "/propagate/vote/retreat":
+            
         elif request_path == "/propagate/board":
             new_message()
             content = json.loads(parameters['entry'][0])
