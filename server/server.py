@@ -213,13 +213,13 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         if request_path == "/vote/byzantine":
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
+            self.server.byzantine_votes[self.server.get_ip_address()] = False 
             self.success_out()
-            if self.has_all_votes():
-                vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
-                i = 0
-                for vessel in self.server.vessels:
-                    self.server.contact_vessel(vessel, "/propagate/vote", "POST", self.server.get_ip_address(), vote[i])
-                    i = i + 1
+            vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
+            i = 0
+            for vessel in self.server.vessels:
+                self.server.contact_vessel(vessel, "/propagate/vote", "POST", self.server.get_ip_address(), vote[i])
+                i = i + 1
             
 
         if request_path == "/propagate/vote":
