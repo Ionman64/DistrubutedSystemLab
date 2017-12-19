@@ -29,7 +29,7 @@ PORT_NUMBER = 61001
 DEBUG = False
 LOCALHOST = "127.0.0.1"
 PORT_PREFIX = "6100"
-DEBUG_MODE = True
+TIE_BREAKER = False
 
 class BlackboardServer(HTTPServer):
 
@@ -246,6 +246,15 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "It's Round Two"
             print "byz_votes: %s" % self.server.vector_byzantine_votes
             self.server.round = 2
+            result_vector = evaluate_votes(self.server.vessels, vector)
+            count_true = count(result_vector, True)
+            count_false = count(result_vector, False)
+            if count_true > count_false:
+                self.wfile.write(json.dumps({"status":"ok", "result":True}))
+            elif count_true < count_false:
+                self.wfile.write(json.dumps({"status":"ok", "result":False}))
+            else:
+                self.wfile.write(json.dumps({"status":"ok", "result":TIE_BREAKER}))
             #decide on plan
 
         #if self.server.isByzantineNode:
@@ -310,20 +319,51 @@ def return_entry_timestamp(entry):
         return 0
     return entry['timestamp']
 
-def evaluate_votes(vector):
-    result_vector = []
-    list_of_nodes = vector.keys()
-    return ["Fasdfasdf"]
+def evaluate_votes(vessels, vector):
+    result_vector = {}
+    #list_of_nodes = vector.keys()TIE_BREAKER = False
+    #nodes = [1,2,3,4] 
+    #this should be the vessel list
+    for node in vessels:
+        if node == server.get_ip_address():
+            continue
+        for index in range(len(nodes)):
+            count_true = count_by_index(vector, node, True)
+            count_false = count_by_index(vector, node, False)
+            if (count_true > count_false):
+                result_vector[node] = True
+            elif (count_true < count_false):
+                result_vector[node] = False
+            else:
+                result_vector[node] = TIE_BREAKER
+    return result_vector
 
-# Execute the code
+def count(dictionary, filter):
+    if type(dictionary) != type({}):
+        raise Exception("Tried to count something other than a dict")
+    count = 0
+    for key in dictionary:
+        if dictionary[key] == filter:
+            count = count + 1
+    return count
+
+def count_by_index(vector, index, filter):
+    if type(vector) != type({}):
+        raise Exception("Tried to count something other than a dict")
+    count = 0
+    for key in vector:
+        if vector[key][index] == filter:
+            count = count + 1
+    return count
+
 if __name__ == '__main__':
     #TEST
 
-    testvector = {1: {1: True, 2: False, 3: True, 4: True},
-       2: {1: True, 2: False, 3: True, 4: False},
-       3: {1: True, 2: False, 3: True, 4: True},
-       4: {1: True, 2: False, 3: True, 4: False}}
-    print "result: %s" % evaluate_votes(testvector)
+    #testvector = {1: {1: False, 2: False, 3: True, 4: True},
+    #   2: {1: False, 2: False, 3: True, 4: True},
+    #   3: {1: False, 2: False, 3: True, 4: True},
+    #   4: {1: False, 2: False, 3: True, 4: False}}
+    #print "result: %s" % evaluate_votes(testvector)
 
     index = read_file("index.html");
     vessel_list = []
