@@ -91,6 +91,9 @@ $(document).ready(function() {
 		$("#board-contents").on("click", ".byzantine", function() {
     	byzantine_ajax($(this));
     });
+	$(".btn").on("click", function() {
+		$(".btn").attr("disabled", "disabled");
+	});
 	$("#attack-button").click(function() {
 		attack_ajax();
 	});
@@ -197,9 +200,9 @@ footer {
 		<!-- This place shows the buttons used to request a vote -->
 		<div id="vote_form_placeholder">
 		<h3>Vote</h3>
-			<button id="attack-button">Attack</button>
-			<button id="retreat-button">Retreat</button>
-			<button id="byzantine-button">Byzantine</button>
+			<button class="btn" id="attack-button">Attack</button>
+			<button class="btn" id="retreat-button">Retreat</button>
+			<button class="btn" id="byzantine-button">Byzantine</button>
 		</div>
 
 		<h3>Result</h3>
