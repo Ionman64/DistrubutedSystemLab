@@ -317,8 +317,8 @@ def evaluate_votes(vessels, vector):
     #nodes = [1,2,3,4] 
     #this should be the vessel list
     for node in vessels:
-        if node == server.get_ip_address():
-            continue
+        #if node == server.get_ip_address():
+        #continue
         for index in range(len(vessels)):
             count_true = count_by_index(vector, node, True)
             count_false = count_by_index(vector, node, False)
