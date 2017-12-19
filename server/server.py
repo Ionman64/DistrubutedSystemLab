@@ -43,6 +43,7 @@ class BlackboardServer(HTTPServer):
         # Create vector clock and initalize all to 0
         self.vclock = dict.fromkeys(self.vessels, 0)
         self.byzantine_votes = {}
+        self.vector_votes = {}
         self.isByzantineNode = False
 
     def tick(self):
@@ -234,51 +235,12 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
                     self.retransmit(request_path, "POST", self.server.get_ip_address(), "False")
             self.success_out()
             return
-        if request_path == "/board":
-            keys = parameters.keys()
-            entry_id = None
-            entry = None
-            if 'entry' not in keys:
-                self.error_out("No entry parameter")
-                return
-            self.success_out()
-            entry = parameters['entry'][0]
-            action = None
-            tick = self.server.tick() # tick vector clock on the new event
-            new_message()
-            if 'id' not in keys:
-                # generate id if not provided (new entry)
-                entry_id = str(uuid.uuid4())
-                self.server.database.save_post(entry_id, entry, DATABASE_CREATE, -1, tick, self.server.get_ip_address())
-                action = DATABASE_CREATE
-            else:
-                # get from parameters (modified entry)
-                entry_id = parameters['id'][0]
-                self.server.database.save_post(entry_id, entry, DATABASE_MODIFY, self.server.database.get_logical_clock(entry_id), tick, self.server.get_ip_address())
-                action = DATABASE_MODIFY
 
-            retransmit_msg = {'id':entry_id, 'action':action, "logical_timestamp": self.server.database.get_logical_clock(entry_id), 'text':entry, 'pid': self.server.get_ip_address(), 'vc': self.server.vclock}
-            self.retransmit(request_path, "POST", entry_id, json.dumps(retransmit_msg))
-
-
-        if request_path == "/propagate/vote/attack":
-            
-        if request_path == "/propagate/vote/retreat":
-            
-        elif request_path == "/propagate/board":
-            new_message()
-            content = json.loads(parameters['entry'][0])
-            id = content["id"]
-            entry = content["text"]
-            modified_by = content['pid']
-            logical_timestamp = content["logical_timestamp"]
-            action = content["action"]
-            incoming_vclock = content['vc']
-            self.success_out()
-            self.server.update_clock(incoming_vclock)
-            self.server.database.save_post(id, entry, action, logical_timestamp, self.server.vclock[modified_by], modified_by)
-
-
+        if request_path == "/propagate/vote/":
+            id_sender = parameters['id'][0]
+            votes_vector = parameter['entry'][0]
+        
+            self.server.vector_votes[id_sender] = parameter[vector_votes]
 
     def success_out(self):
             self.set_HTTP_headers(200)
