@@ -33,13 +33,23 @@ function load_board_ajax() {
 		crossOrigin:true,
 		success:function(data, status) {
 			$("#vote_result_placeholder").empty();
-			$.each(data, function(key, value) {
-				console.log(value);
-				var span = document.createElement("span");
-				span.innerHTML = key + " : " + (value ? "Attack" : "Retreat");
-				span.className = "bold " + (value ? "attack" : "retreat");
+			var span = document.createElement("span");
+				span.innerHTML = "Final Result: " + data.result;
 				$("#vote_result_placeholder").append(span);
 				$("#vote_result_placeholder").append("<br>");
+			$.each(data.result_vector, function(key, value) {
+				var span = document.createElement("span");
+				if(value == "UNKNOWN"){
+					span.innerHTML = key + " : " + value;
+					span.className = "bold " + "unknown";
+					$("#vote_result_placeholder").append(span);
+					$("#vote_result_placeholder").append("<br>");
+				} else {
+					span.innerHTML = key + " : " + (value ? "Attack" : "Retreat");
+					span.className = "bold " + (value ? "attack" : "retreat");
+					$("#vote_result_placeholder").append(span);
+					$("#vote_result_placeholder").append("<br>");
+				}
 			});
 		},
 		complete:function() {
@@ -69,6 +79,15 @@ function byzantine_ajax() {
  		crossOrigin:true
 	});
 }
+
+function reset_ajax() {
+	$.ajax({
+		url:"/reset",
+		method:"POST",
+ 		crossOrigin:true
+	});
+}
+
 function reload_countdown(remaining) {
     $("#countdown_placeholder").text("reloading page in: " + remaining + " seconds.");
     if (remaining <= 0) {
@@ -100,8 +119,11 @@ $(document).ready(function() {
 	$("#retreat-button").click(function() {
 		retreat_ajax();
 	});
-	$("#byzantine-button").click(function() {http://127.0.0.1:61001/
+	$("#byzantine-button").click(function() {
 		byzantine_ajax();
+	});
+	$("#reset-button").click(function() {
+		reset_ajax();
 	});
 	$("#results-button").click(function() {
 		load_board_ajax();
@@ -163,6 +185,9 @@ footer {
 .retreat {
 	color:red;
 }
+.unknown {
+	color:gray;
+}
 </style>
 </head>
 	<body>
@@ -206,6 +231,7 @@ footer {
 		</div>
 
 		<h3>Result</h3>
+		<button id="reset-button">Reset</button>
 		<button id="results-button">Refresh Vote Result</button>
 
 		<div id="vote_result_placeholder">

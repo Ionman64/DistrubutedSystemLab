@@ -16,7 +16,6 @@ from codecs import open # Open a file
 from threading import  Thread # Thread Management
 import uuid
 import json
-import sqlite3
 import os
 from collections import OrderedDict
 from datetime import datetime
@@ -29,14 +28,14 @@ PORT_NUMBER = 61001
 DEBUG = False
 LOCALHOST = "127.0.0.1"
 PORT_PREFIX = "6100"
-TIE_BREAKER = False
+TIE_BREAKER = True
 TRAITORS = 1
 
 class BlackboardServer(HTTPServer):
 
     def __init__(self, server_address, handler, node_id, vessel_list):
     # We call the super init
-        HTTPServer.__init__(self,server_address, handler)
+        HTTPServer.__init__(self, server_address, handler)
         # our own ID (IP is 10.1.0.ID)
         self.vessel_id = node_id
         # The list of other vessels
@@ -47,6 +46,7 @@ class BlackboardServer(HTTPServer):
         self.isByzantineNode = False
         self.round = 0
         self.result_vector = {}
+        self.has_voted = False
 
     # Closes socket before shutdown so it can be reused in tests.
     def shutdown(self):
@@ -98,7 +98,7 @@ class BlackboardServer(HTTPServer):
 
 
     # We send a received value to all the other vessels of the system
-    def propagate_value_to_vessels(self, path, action_type, key, value, ):
+    def propagate_value_to_vessels(self, path, action_type, key, value):
         # We iterate through the vessel list
         for vessel in self.vessels:
             # We should not send it to our own IP, or we would create an infinite loop of updates
@@ -108,6 +108,33 @@ class BlackboardServer(HTTPServer):
                 print "---> propagating to %s" % vessel
                 self.contact_vessel(vessel, path, action_type, key, value)
 
+
+    def propagate_byz_votes(self, votes):
+        # set args
+        path = "/propagate/vote"
+        action_type = "POST"
+        key = self.get_ip_address()
+        sorted_vessels = sorted(self.vessels)
+        values = []
+        # convert vote array
+        for vote in votes:
+            if isinstance(vote, list):
+                # {1: True, 2: False, 3: False, 4: True}
+                vector = {}
+                for i in range(len(vote)):
+                    v_id = sorted_vessels[i]
+                    val = "True" if vote[i] else "False"
+                    vector[v_id] = val
+                values.append(json.dumps(vector))
+            else:
+                # True / False
+                val = "True" if vote else "False"
+                values.append(val)
+        # propagate
+        sorted_vessels.remove(key) #remove youself
+        for i in range(len(sorted_vessels)):
+            print "---> propagating to %s , key:%s  value: %s" % (sorted_vessels[i], key, values[i])
+            self.contact_vessel(sorted_vessels[i], path, action_type, key, values[i])
 
 #------------------------------------------------------------------------------------------------------
 # This class implements the logic when a server receives a GET or POST request
@@ -152,9 +179,16 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         # Here, we should check which path was requested and call the right logic based on it
         if self.path == "/vote/result":
             self.set_HTTP_headers(200)
-            self.wfile.write(json.dumps(self.server.result_vector))
-            self.finish()
-            #self.success_out()
+            final_result = "undecided"
+            if len(self.server.result_vector) > 0:
+                final_result = calc_final_result(self.server.result_vector)
+
+            sorted_result_vector = OrderedDict(sorted(self.server.result_vector.items()))
+            response = {'result': final_result, 'result_vector': sorted_result_vector}
+            self.wfile.write(json.dumps(response))
+            print "VotesR1: %d" % len(self.server.byzantine_votes)
+            print "VotesR2: %d" % len(self.server.vector_byzantine_votes)
+
         else:
             self.do_GET_Index()
 
@@ -167,24 +201,6 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         self.set_HTTP_headers(200)
         self.wfile.write(index)
 
-    def compute_byzantine_vote_round1(self, no_loyal, on_tie):
-        result_vote = []
-        for i in range(0,no_loyal):
-            if i%2==0:
-                result_vote.append(not on_tie)
-            else:
-                result_vote.append(on_tie)
-        return result_vote
-
-    def compute_byzantine_vote_round2(self, no_loyal,no_total,on_tie):
-        result_vectors=[]
-        for i in range(0,no_loyal):
-            if i%2==0:
-                result_vectors.append([on_tie]*no_total)
-            else:
-                result_vectors.append([not on_tie]*no_total)
-        return result_vectors
-
 #------------------------------------------------------------------------------------------------------
 # Request handling - POST
 #------------------------------------------------------------------------------------------------------
@@ -195,112 +211,126 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
         request_path = self.path
         parameters = self.parse_POST_request()
         print("Receiving a POST on %s" % self.path)
-        print "parameters: %s" % parameters
-        self.set_HTTP_headers(200)
+        #print "parameters: %s" % parameters
+        self.success_out()
 
         if request_path == "/vote/attack":
             print "I am voting to attack"
             self.server.byzantine_votes[self.server.get_ip_address()] = True
-            self.success_out()
+            self.server.voted = True
             self.retransmit("/vote", "POST", self.server.get_ip_address(), "True")
             
 
         if request_path == "/vote/retreat":
             print "I am voting to retreat"
             self.server.byzantine_votes[self.server.get_ip_address()] = False
-            self.success_out()
+            self.server.voted = True
             self.retransmit("/vote", "POST", self.server.get_ip_address(), "False")
             
 
         if request_path == "/vote/byzantine":
             print "I am voting to byzantine"
             self.server.isByzantineNode = True
-            self.server.byzantine_votes[self.server.get_ip_address()] = False 
-            self.success_out()
-            vote = self.compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
-            print (vote)
-            i = 0
-            for vessel in self.server.vessels:
-                if vessel == self.server.get_ip_address():
-                    continue
-                self.server.contact_vessel(vessel, "/propagate/vote", "POST", self.server.get_ip_address(), vote[i])
-                i = i + 1
-            
+            self.server.byzantine_votes[self.server.get_ip_address()] = False
+            self.server.voted = True
+            fake_votes = compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
+            print "Fake votes: %s" % fake_votes
+            self.retransmit_byz_votes(fake_votes)
+        
+        # call this from all nodes and refresh page to vote again.
+        if request_path == "/reset":
+            print "Resetting..."
+            self.server.byzantine_votes = {}
+            self.server.vector_byzantine_votes = {}
+            self.server.isByzantineNode = False
+            self.server.round = 0
+            self.server.result_vector = {}
+            self.server.has_voted = False
 
         if request_path == "/propagate/vote":
+            # removE?
             id_sender = parameters['id'][0]
             value = parameters['entry'][0]
             if value == 'True' or value == 'False':
                 # its a vote
-                print "Receiving vote"
+                print "Receiving R1 vote"
                 if value == 'True':
                     self.server.byzantine_votes[id_sender] = True
                 if value == 'False':
                     self.server.byzantine_votes[id_sender] = False
             else:
                 # its a dict
-                "Receiving vote array"
+                print "Receiving R2 vote array"
                 self.server.vector_byzantine_votes[id_sender] = json.loads(value)
 
-        if self.isRoundOne() and self.server.round == 0:
-            print "It's Round One"
-            print "byz_votes: %s" % self.server.byzantine_votes
-            self.server.vector_byzantine_votes[self.server.get_ip_address()] = self.server.byzantine_votes
-            self.retransmit("/vote", "POST", self.server.get_ip_address(), json.dumps(self.server.byzantine_votes))
-            self.server.round = 1
+        if self.server.isByzantineNode:
+            if self.has_all_votes() and self.server.round == 0:
+                self.server.round = 1
+                print "Byz have all votes and sending fakes"
+                #fake_votes = compute_byzantine_vote_round1(len(self.server.vessels)-TRAITORS, TIE_BREAKER)
+                #self.retransmit_byz_votes(fake_votes)
 
-        if self.isRoundTwo() and self.server.round == 1:
-            print "It's Round Two"
-            print "byz_votes: %s" % self.server.vector_byzantine_votes
-            self.server.round = 2
-            if self.server.isByzantineNode:
-                self.server.result_vector = self.compute_byzantine_vote_round2(len(self.server.vessels)-TRAITORS,len(self.server.vessels)+1,TIE_BREAKER)
-            else:
-                self.server.result_vector = evaluate_votes(self.server.vessels, self.server.vector_byzantine_votes)
+            elif  self.server.round == 1:
+                self.server.round = 2
+                print "It's Round Two"
+                print "# propagating false vectors"
+                votes = compute_byzantine_vote_round2(len(self.server.vessels)-TRAITORS, len(self.server.vessels),  TIE_BREAKER)
+                self.retransmit_byz_votes(votes)
+
+        if not self.server.isByzantineNode:            
+            if self.has_all_votes() and self.server.round == 0:
+                print "It's Round Two"
+                self.server.round = 2
+                print "# propagateing own vector"
+                self.server.vector_byzantine_votes[self.server.get_ip_address()] = self.server.byzantine_votes
+                self.retransmit("/vote", "POST", self.server.get_ip_address(), json.dumps(self.server.byzantine_votes))
+        
+        print "VotesR1: %d" % len(self.server.byzantine_votes)
+        print "VotesR2: %d" % len(self.server.vector_byzantine_votes)
+        # Calc result
+        if self.has_all_vector_votes() and len(self.server.result_vector) == 0:
+            print "Calculating results..."
+            #print "input:"
+            #print_vector(self.server.vector_byzantine_votes)
+            self.server.result_vector = evaluate_votes(self.server.vector_byzantine_votes, self.server.get_ip_address())
+            #print "result:"
+            #print_vector(self.server.result_vector)
+
 
     def has_all_votes(self):
-         return len(self.server.byzantine_votes) == len(self.server.vessels)
-
+        return len(self.server.byzantine_votes) == len(self.server.vessels)
+    
     def has_all_vector_votes(self):
-         return len(self.server.vector_byzantine_votes) == len(self.server.vessels)
-
-    def isRoundOne(self):
-        if not self.has_all_votes():
-           return False
-        success = True
-        for key in self.server.byzantine_votes:
-            if type(self.server.byzantine_votes[key]) != type(True):
-                success = False
-        return success
-
-    def isRoundTwo(self):
-        if not self.has_all_vector_votes():
-               return False
-        success = True
-        for key in self.server.vector_byzantine_votes:
-            if type(self.server.vector_byzantine_votes[key]) != type({}):
-                success = False
-        return success
-
+        return len(self.server.vector_byzantine_votes) == len(self.server.vessels)
 
     def success_out(self):
-            self.set_HTTP_headers(200)
-            self.wfile.write(json.dumps({"status": "OK"}))
-            self.wfile.close()
+        self.set_HTTP_headers(200)
+        self.wfile.write(json.dumps({"status": "OK"}))
+        self.wfile.close()
 
     def error_out(self, reason=None, header=200):
-            self.set_HTTP_headers(header)
-            self.wfile.write(json.dumps({"status": "FAIL", "reason":reason}))
-            self.wfile.close()
+        self.set_HTTP_headers(header)
+        self.wfile.write(json.dumps({"status": "FAIL", "reason":reason}))
+        self.wfile.close()
 
     def retransmit(self, action, action_type, key = None, value = None):
-            action = ''.join(["/propagate", action])
-            print "retransmitting to vessels on" + action
-            thread = Thread(target=self.server.propagate_value_to_vessels,args=(action, action_type, key, value))
-            # We kill the process if we kill the server
-            thread.daemon = True
-            # We start the thread
-            thread.start()
+        action = ''.join(["/propagate", action])
+        print "retransmitting to vessels on" + action
+        thread = Thread(target=self.server.propagate_value_to_vessels, args=(action, action_type, key, value))
+        # We kill the process if we kill the server
+        thread.daemon = True
+        # We start the thread
+        thread.start()
+
+    def retransmit_byz_votes(self, votes):
+        #retransmitting bool arr or  2d bool arr
+        print "retransmitting byz votes for round %d:" % self.server.round
+        thread = Thread(target=self.server.propagate_byz_votes, args=(votes,)) # wrap in tuple to force single argument
+        # We kill the process if we kill the server
+        thread.daemon = True
+        # We start the thread
+        thread.start()
+
 
 # file i/o
 def read_file(filename):
@@ -316,24 +346,23 @@ def return_entry_timestamp(entry):
         return 0
     return entry['timestamp']
 
-def evaluate_votes(vessels, vector):
+
+def evaluate_votes(vector, this_node):
     result_vector = {}
-    #list_of_nodes = vector.keys()TIE_BREAKER = False
-    #nodes = [1,2,3,4] 
-    #this should be the vessel list
-    for node in vessels:
-        if node == server.get_ip_address():
-            continue
-        for index in range(len(vessels)):
-            count_true = count_by_index(vector, node, True)
-            count_false = count_by_index(vector, node, False)
-            if (count_true > count_false):
-                result_vector[node] = True
-            elif (count_true < count_false):
-                result_vector[node] = False
-            else:
-                result_vector[node] = TIE_BREAKER
+    sorted_nodes = sorted(vector)
+    for node in sorted_nodes:
+        count_true = count_by_index(vector, node, this_node, True)
+        count_false = count_by_index(vector, node, this_node, False)
+        #print "node:%s T: %d  F:%d" % (str(node) ,count_true, count_false)
+        if (count_true > count_false):
+            result_vector[node] = True
+        elif (count_true < count_false):
+            result_vector[node] = False
+        else:
+            result_vector[node] = TIE_BREAKER
+            #result_vector[node] = 'UNKNOWN'
     return result_vector
+
 
 def count(dictionary, filter):
     if type(dictionary) != type({}):
@@ -344,31 +373,117 @@ def count(dictionary, filter):
             count = count + 1
     return count
 
-def count_by_index(vector, index, filter):
+def count_by_index(vector, index, ignore_self, filter):
     if type(vector) != type({}):
         raise Exception("Tried to count something other than a dict")
     count = 0
     for key in vector:
-        if vector[key][index] == filter:
+        #if key == ignore_self: remove your own vector row
+        if key == index:
+            continue # dont count your own value
+        if vector[key][index] == filter or vector[key][index] == str(filter):
             count = count + 1
     return count
 
+#------------------ Byzantine Behaviour -------------------------
+def compute_byzantine_vote_round1(no_loyal, on_tie):
+    result_vote = []
+    for i in range(0, no_loyal):
+        if i%2 == 0:
+            result_vote.append(not on_tie)
+        else:
+            result_vote.append(on_tie)
+    return result_vote
+
+def compute_byzantine_vote_round2(no_loyal, no_total, on_tie):
+    result_vectors = []
+    for i in range(0, no_loyal):
+        if i%2 == 0:
+            result_vectors.append([on_tie]*no_total)
+        else:
+            result_vectors.append([not on_tie]*no_total)
+    return result_vectors
+
+#-----------------------------------------------------------------
+
+def calc_final_result(res_vector):
+    final_result = "undecided"
+    count_true = count(res_vector, True)
+    count_false = count(res_vector, False)
+    if count_true > count_false:
+        final_result = "Attack"
+    elif count_true < count_false:
+        final_result = "Retreat"
+    else:
+        final_result = "Attack on tiebreaker" if TIE_BREAKER else "Retreat on tiebreaker" 
+    return final_result
+
+def print_vector(vector):
+    for key in sorted(vector):
+        print "Node:%s: %s" % (key, vector[key])
+       
 if __name__ == '__main__':
+    
     #TEST
+    """
+    # test evaluate_votes
+    testvector1 = {
+        1: {1: True, 2: True, 3: True},
+        2: {1: False, 2: True, 3: False},
+        3: {1: True, 2: True, 3: False}
+    }
+    res = evaluate_votes(testvector1, 1)
+    print "p1 test: %s" % (res == {1: True, 2: True, 3: True})
+    print calc_final_result(res)
+    
+    testvector2 = {
+        1: {1: False, 2: False, 3: False},
+        2: {1: False, 2: True, 3: False},
+        3: {1: True, 2: True, 3: False}
+    }
+    res = evaluate_votes(testvector2, 2)
+    print "p2 test: %s" % (res == {1: True, 2: True, 3: False})
+    print calc_final_result(res)
+    
+    testvector = {
+        1: {1: True, 2: False, 3: False, 4: True},
+        2: {1: True, 2: False, 3: False, 4: True},
+        3: {1: True, 2: False, 3: False, 4: False},
+        4: {1: False, 2: False, 3: False, 4: False}  
+    }
+    res = evaluate_votes(testvector, 1)
+    print "p1 res: %s" % res
+    print calc_final_result(res)
 
-    #testvector = {1: {1: False, 2: False, 3: True, 4: True},
-    #   2: {1: False, 2: False, 3: True, 4: True},
-    #   3: {1: False, 2: False, 3: True, 4: True},
-    #   4: {1: False, 2: False, 3: True, 4: False}}
-    #print "result: %s" % evaluate_votes(testvector)
+    testvector = {
+        1: {1: True, 2: False, 3: False, 4: True},
+        2: {1: True, 2: False, 3: False, 4: True},
+        3: {1: True, 2: False, 3: False, 4: False},
+        4: {1: True, 2: True, 3: True, 4: True}  
+    }
+    res = evaluate_votes(testvector, 2)
+    print "p2 res: %s" % res
+    print calc_final_result(res)
 
-    index = read_file("index.html");
+    testvector = {
+        1: {1: True, 2: False, 3: False, 4: True},
+        2: {1: True, 2: False, 3: False, 4: True},
+        3: {1: True, 2: False, 3: False, 4: False},
+        4: {1: False, 2: True, 3: False, 4: True}  
+    }
+    res = evaluate_votes(testvector, 3)
+    print "p3 res: %s" % res
+    print calc_final_result(res)
+
+    quit()
+    #"""
+    index = read_file("index.html")
     vessel_list = []
     vessel_id = 0
     # Checking the arguments
     nr_args = len(sys.argv)
     if nr_args < 3 or nr_args > 4: # 2 args, the script and the vessel name
-        print("Arguments: vessel_ID number_of_vessels [--debug]" )
+        print "Arguments: vessel_ID number_of_vessels [--debug]"
 
     elif len(sys.argv) == 4 and sys.argv[3] == "--debug":
         # Set port as id instead of ip for running on localhost:
@@ -379,7 +494,7 @@ if __name__ == '__main__':
         # We launch a server
         port_nr = int(PORT_PREFIX + str(vessel_id))
         server = BlackboardServer((LOCALHOST, port_nr), BlackboardRequestHandler, vessel_id, vessel_list)
-        print("Starting DEBUG server on port: %s:%d" % (LOCALHOST, port_nr))
+        print "Starting DEBUG server on port: %s:%d" % (LOCALHOST, port_nr)
     else:
         # We need to know the vessel IP
         vessel_id = int(sys.argv[1])
@@ -389,7 +504,7 @@ if __name__ == '__main__':
 
         # We launch a server
         server = BlackboardServer(('', PORT_NUMBER), BlackboardRequestHandler, vessel_id, vessel_list)
-        print("Starting the server on port: %d" % PORT_NUMBER)
+        print "Starting the server on port: %d" % PORT_NUMBER
 
 
     # Printing all vessels
@@ -405,5 +520,4 @@ if __name__ == '__main__':
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
-        print("Stopping Server")
-#-------------------------------------------------------------------------------------
+        print "Stopping Server"
