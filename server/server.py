@@ -292,7 +292,7 @@ class BlackboardRequestHandler(BaseHTTPRequestHandler):
             print "Calculating results..."
             #print "input:"
             #print_vector(self.server.vector_byzantine_votes)
-            self.server.result_vector = evaluate_votes(self.server.vector_byzantine_votes, self.server.get_ip_address())
+            self.server.result_vector = evaluate_votes(self.server.vector_byzantine_votes)
             #print "result:"
             #print_vector(self.server.result_vector)
 
@@ -347,12 +347,12 @@ def return_entry_timestamp(entry):
     return entry['timestamp']
 
 
-def evaluate_votes(vector, this_node):
+def evaluate_votes(vector):
     result_vector = {}
     sorted_nodes = sorted(vector)
     for node in sorted_nodes:
-        count_true = count_by_index(vector, node, this_node, True)
-        count_false = count_by_index(vector, node, this_node, False)
+        count_true = count_by_index(vector, node, True)
+        count_false = count_by_index(vector, node, False)
         #print "node:%s T: %d  F:%d" % (str(node) ,count_true, count_false)
         if (count_true > count_false):
             result_vector[node] = True
@@ -373,12 +373,11 @@ def count(dictionary, filter):
             count = count + 1
     return count
 
-def count_by_index(vector, index, ignore_self, filter):
+def count_by_index(vector, index, filter):
     if type(vector) != type({}):
         raise Exception("Tried to count something other than a dict")
     count = 0
     for key in vector:
-        #if key == ignore_self: remove your own vector row
         if key == index:
             continue # dont count your own value
         if vector[key][index] == filter or vector[key][index] == str(filter):
@@ -425,24 +424,27 @@ def print_vector(vector):
 if __name__ == '__main__':
     
     #TEST
-    """
+    
     # test evaluate_votes
+    """
     testvector1 = {
-        1: {1: True, 2: True, 3: True},
-        2: {1: False, 2: True, 3: False},
-        3: {1: True, 2: True, 3: False}
+        1: {1: False, 2: False, 3: False},
+        2: {1: True, 2: False, 3: False},
+        3: {1: False, 2: False, 3: False}
     }
-    res = evaluate_votes(testvector1, 1)
-    print "p1 test: %s" % (res == {1: True, 2: True, 3: True})
+    res = evaluate_votes(testvector1)
+    print res
+    #print "p1 test: %s" % (res == {1: True, 2: True, 3: True})
     print calc_final_result(res)
     
     testvector2 = {
-        1: {1: False, 2: False, 3: False},
-        2: {1: False, 2: True, 3: False},
-        3: {1: True, 2: True, 3: False}
+        1: {1: True, 2: True, 3: True},
+        2: {1: True, 2: False, 3: False},
+        3: {1: False, 2: False, 3: False}
     }
-    res = evaluate_votes(testvector2, 2)
-    print "p2 test: %s" % (res == {1: True, 2: True, 3: False})
+    res = evaluate_votes(testvector2)
+    print res
+    #print "p2 test: %s" % (res == {1: True, 2: True, 3: False})
     print calc_final_result(res)
     
     testvector = {
@@ -476,7 +478,8 @@ if __name__ == '__main__':
     print calc_final_result(res)
 
     quit()
-    #"""
+    """
+    
     index = read_file("index.html")
     vessel_list = []
     vessel_id = 0
